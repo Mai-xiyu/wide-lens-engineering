@@ -1,0 +1,4 @@
+interface:
+  display_name: "Wide-Lens Review"
+  short_description: "Adversarial, evidence-gated review for complex work"
+  default_prompt: "Use $wide-lens-review to map this change, run independent review lenses, and verify the result."

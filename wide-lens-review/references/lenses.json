@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "base": [
+    "system-map",
+    "contract-boundaries",
+    "adversarial-counterexample",
+    "verification-oracle",
+    "orthogonal-wildcard"
+  ],
+  "light": [
+    "system-map",
+    "adversarial-counterexample"
+  ],
+  "lenses": [
+    {
+      "id": "system-map",
+      "title": "System map and hidden consumers",
+      "mission": "Trace inputs, callers, state, outputs, consumers, deployment surfaces, and tests beyond the changed files.",
+      "question": "Which dependency or consumer makes the local change behave differently at system scale?",
+      "disconfirm": "Try to prove that every material upstream and downstream edge is already represented in the proposed impact surface.",
+      "evidence": "Name inspected entry points, dependency edges, consumers, and tests with file or command references.",
+      "triggers": []
+    },
+    {
+      "id": "contract-boundaries",
+      "title": "Contracts and invariants",
+      "mission": "Extract explicit and implicit contracts, state invariants, error semantics, and compatibility promises.",
+      "question": "What invariant could the change violate while all happy-path tests still pass?",
+      "disconfirm": "Search for callers, schemas, fixtures, or documentation that contradict the inferred contract.",
+      "evidence": "Reference the contract source and at least one boundary or failure path inspected.",
+      "triggers": []
+    },
+    {
+      "id": "adversarial-counterexample",
+      "title": "Counterexample and abuse of assumptions",
+      "mission": "Construct the smallest realistic counterexample to the plan, including malformed, stale, reordered, partial, or hostile inputs.",
+      "question": "What is the cheapest input or event sequence that makes the intended result false?",
+      "disconfirm": "Attempt the counterexample or show the exact guard that prevents it.",
+      "evidence": "Provide a reproduction, test target, trace, or precise guard reference.",
+      "triggers": []
+    },
+    {
+      "id": "verification-oracle",
+      "title": "Independent verification oracle",
+      "mission": "Define observations that distinguish success from plausible-looking failure without trusting the implementation's own claims.",
+      "question": "Which independent test or measurement would fail if the implementation were subtly wrong?",
+      "disconfirm": "Look for assertions that only restate implementation details or mock away the risky boundary.",
+      "evidence": "Name exact commands, assertions, fixtures, measurements, and untested gaps.",
+      "triggers": []
+    },
+    {
+      "id": "orthogonal-wildcard",
+      "title": "Forced orthogonal frame",
+      "mission": "Apply a deterministic frame that is deliberately different from the task's dominant framing.",
+      "question": "What becomes visible after changing the representation or observer?",
+      "disconfirm": "Try to show that the alternate frame adds no new causal surface.",
+      "evidence": "Record the alternate frame, what it exposed, and the inspected evidence.",
+      "triggers": []
+    },
+    {
+      "id": "security-abuse",
+      "title": "Security and privilege abuse",
+      "mission": "Trace trust boundaries, identities, authorization, secrets, injection sinks, and attacker-controlled values.",
+      "question": "How can an untrusted caller gain data, authority, execution, or persistence it should not have?",
+      "disconfirm": "Search for bypass callers and validate guards at the final privileged sink, not only at the first entry point.",
+      "evidence": "Reference sources, sinks, guards, identities, and a negative or abuse-path check.",
+      "triggers": [
+        "security", "secure", "hardening", "auth", "authentication", "authorization", "authn", "authz", "oauth", "jwt", "permission", "permissions", "privilege", "privileges", "role", "roles", "secret", "secrets", "credential", "credentials", "access token", "api token", "bearer token", "xss", "csrf", "sql injection", "injection", "sandbox", "tenant", "webhook", "webhooks", "webhook signature", "signature bypass", "权限", "鉴权", "认证", "密钥", "租户", "注入", "越权"
+      ]
+    },
+    {
+      "id": "concurrency-ordering",
+      "title": "Concurrency and ordering",
+      "mission": "Inspect races, atomicity, locks, cancellation, duplicate work, ordering, and time-of-check/time-of-use gaps.",
+      "question": "Which interleaving, retry, cancellation, or duplicate event breaks the invariant?",
+      "disconfirm": "Construct a two-worker or reordered-event schedule and identify the synchronization that rules it out.",
+      "evidence": "Reference shared state, synchronization points, queue semantics, and a concurrency-focused check.",
+      "triggers": [
+        "async", "await", "thread", "threads", "worker", "workers", "race", "races", "lock", "locks", "mutex", "semaphore", "concurrent", "concurrency", "parallel", "queue", "queues", "deadlock", "atomic", "cancellation", "并发", "竞态", "锁", "队列", "原子", "死锁", "取消"
+      ]
+    },
+    {
+      "id": "data-lifecycle",
+      "title": "Data lifecycle and recoverability",
+      "mission": "Trace creation, validation, migration, mutation, retention, deletion, restore, and partial-failure behavior.",
+      "question": "How can valid data become lost, duplicated, orphaned, stale, or irrecoverable?",
+      "disconfirm": "Exercise partial writes, old records, retries, rollback, restore, and mixed-version data.",
+      "evidence": "Reference schemas, transactions, migration order, retention behavior, and recovery checks.",
+      "triggers": [
+        "database", "databases", "schema", "schemas", "migration", "migrations", "migrate", "transaction", "transactions", "commit", "rollback", "delete", "restore", "backup", "retention", "persistence", "idempotent", "idempotency", "数据", "数据库", "迁移", "事务", "回滚", "删除", "恢复", "备份", "幂等"
+      ]
+    },
+    {
+      "id": "compatibility-consumers",
+      "title": "API and consumer compatibility",
+      "mission": "Check wire formats, public interfaces, version skew, caller assumptions, deprecation, and rollout order.",
+      "question": "Which old or external consumer breaks even though the new producer works with itself?",
+      "disconfirm": "Inspect real callers and test mixed old/new producer-consumer combinations.",
+      "evidence": "Reference interface definitions, consumers, versions, fixtures, and compatibility checks.",
+      "triggers": [
+        "api", "rest", "graphql", "grpc", "protobuf", "openapi", "public interface", "backward", "compatibility", "compatible", "version", "versions", "client", "clients", "consumer", "consumers", "sdk", "接口", "兼容", "版本", "客户端", "调用方", "消费者"
+      ]
+    },
+    {
+      "id": "distributed-failure",
+      "title": "Distributed failure and delivery semantics",
+      "mission": "Inspect network partitions, retries, timeouts, duplicate delivery, eventual consistency, and remote partial success.",
+      "question": "What happens when the remote side succeeds but the local side observes a timeout?",
+      "disconfirm": "Model loss, duplication, delay, reordering, and split success across process boundaries.",
+      "evidence": "Reference retry policies, timeout boundaries, delivery guarantees, reconciliation, and failure checks.",
+      "triggers": [
+        "distributed", "microservice", "network", "timeout", "retry", "message bus", "event", "kafka", "rabbitmq", "webhook", "eventual", "replica", "remote", "分布式", "网络", "超时", "重试", "消息", "事件", "副本", "远程"
+      ]
+    },
+    {
+      "id": "performance-capacity",
+      "title": "Performance and capacity",
+      "mission": "Inspect algorithmic growth, fan-out, hot paths, allocation, caching, backpressure, and realistic load limits.",
+      "question": "Which input size or traffic shape turns acceptable local behavior into a bottleneck?",
+      "disconfirm": "Estimate or measure the worst plausible path instead of extrapolating from a tiny fixture.",
+      "evidence": "Reference complexity, query counts, allocations, benchmarks, profiles, or capacity assumptions.",
+      "triggers": [
+        "performance", "latency", "throughput", "benchmark", "profile", "memory", "cpu", "cache", "n+1", "backpressure", "scale", "capacity", "性能", "延迟", "吞吐", "基准", "内存", "缓存", "扩展", "容量"
+      ]
+    },
+    {
+      "id": "operability-rollback",
+      "title": "Operability, rollout, and rollback",
+      "mission": "Check deployment order, configuration, observability, alerts, diagnosis, feature controls, rollback, and recovery time.",
+      "question": "How will an operator detect, contain, and reverse a bad release under pressure?",
+      "disconfirm": "Simulate partial rollout or rollback with mixed versions and stale configuration.",
+      "evidence": "Reference deploy/config paths, logs, metrics, alerts, flags, runbooks, and rollback checks.",
+      "triggers": [
+        "deploy", "release", "rollout", "rollback", "restore", "backup", "retention", "kubernetes", "k8s", "docker", "terraform", "config", "infra/", "ops/", ".tf", "feature flag", "log", "logs", "logging", "metric", "alert", "monitor", "runbook", "部署", "发布", "灰度", "回滚", "恢复", "备份", "保留", "配置", "日志", "指标", "告警", "监控"
+      ]
+    },
+    {
+      "id": "user-journey",
+      "title": "User journey and accessibility",
+      "mission": "Trace real user goals, error recovery, accessibility, localization, devices, and slow or offline conditions.",
+      "question": "Which realistic user can no longer complete the job despite the component looking correct?",
+      "disconfirm": "Exercise keyboard, screen-reader, narrow-screen, localized, empty, slow, and error states as applicable.",
+      "evidence": "Reference routes/components, interaction states, accessibility semantics, and end-to-end observations.",
+      "triggers": [
+        "frontend", "ui", "ux", "browser", "mobile", "accessibility", "a11y", "keyboard", "screen reader", "i18n", "localization", "responsive", "form", "前端", "界面", "浏览器", "移动端", "无障碍", "键盘", "国际化", "表单"
+      ]
+    },
+    {
+      "id": "dependency-integrity",
+      "title": "Dependency and supply-chain integrity",
+      "mission": "Inspect dependency necessity, provenance, version constraints, lockfiles, transitive risk, and build reproducibility.",
+      "question": "What new failure or trust boundary enters through this dependency or build change?",
+      "disconfirm": "Check whether the platform or standard library already suffices and whether clean locked builds reproduce.",
+      "evidence": "Reference manifests, lockfiles, advisories, licenses, build output, and the simpler alternative considered.",
+      "triggers": [
+        "dependency", "package", "npm", "pnpm", "yarn", "pip", "poetry", "cargo", "maven", "gradle", "lockfile", "supply chain", "vendor", "依赖", "软件包", "锁文件", "供应链", "第三方库"
+      ]
+    },
+    {
+      "id": "maintainability-simplicity",
+      "title": "Maintainability and deletion pressure",
+      "mission": "Challenge speculative abstraction, duplicated policy, hidden coupling, ownership, and unnecessary moving parts.",
+      "question": "What can be removed or made explicit without weakening the contract?",
+      "disconfirm": "Search for a second real use case before accepting a new abstraction or dependency.",
+      "evidence": "Reference duplication, coupling, ownership boundaries, alternatives, and maintenance burden.",
+      "triggers": [
+        "refactor", "architecture", "abstraction", "framework", "generic", "plugin", "factory", "maintain", "technical debt", "cleanup", "重构", "架构", "抽象", "框架", "插件", "工厂", "维护", "技术债", "清理"
+      ]
+    },
+    {
+      "id": "cost-resources",
+      "title": "Cost and resource economics",
+      "mission": "Estimate steady-state and failure-amplified compute, storage, network, model-token, and operator costs.",
+      "question": "Which retry, fan-out, retention, or worst-case path multiplies cost unexpectedly?",
+      "disconfirm": "Calculate an upper bound using realistic volume and failure assumptions.",
+      "evidence": "Reference unit costs, volume assumptions, quotas, budgets, and a bounded estimate.",
+      "triggers": [
+        "cost", "billing", "price", "budget", "quota", "token budget", "model token", "llm token", "inference", "storage", "egress", "gpu", "cloud", "成本", "计费", "价格", "预算", "配额", "推理", "存储", "云"
+      ]
+    },
+    {
+      "id": "privacy-compliance",
+      "title": "Privacy and compliance",
+      "mission": "Trace personal or regulated data through collection, purpose, access, retention, export, deletion, and audit.",
+      "question": "Where can sensitive data outlive its purpose or cross an unintended boundary?",
+      "disconfirm": "Trace one record end-to-end, including logs, analytics, backups, exports, and deletion propagation.",
+      "evidence": "Reference data fields, purpose, access controls, retention, deletion, audit, and applicable authoritative policy.",
+      "triggers": [
+        "privacy", "pii", "personal data", "gdpr", "hipaa", "compliance", "audit", "consent", "retention", "redact", "anonym", "隐私", "个人信息", "合规", "审计", "同意", "保留", "脱敏", "匿名"
+      ]
+    }
+  ]
+}
