@@ -1,4 +1,4 @@
 interface:
   display_name: "Wide-Lens Engineering"
-  short_description: "Immutable-contract coding and multi-agent delivery"
-  default_prompt: "Use $wide-lens-engineering: capture an external baseline; freeze and externally anchor the complete contract before edits or delegation; let the active main model alone choose whether to use shared subagents plus their identities, count, and lane assignments; keep subagents read-only and main-thread-only writes; apply Ponytail full; require a controller receipt for shared work; and pass the pinned preflight/final gate."
+  short_description: "Practical-first coding with optional assured delivery"
+  default_prompt: "Use $wide-lens-engineering to select assurance, depth, and coordination separately; default to practical focused work only for isolated low-risk changes, escalate to assured when trust or blast radius requires it, let the active main model choose shared-subagent identities, count, and lanes, keep subagents read-only, and keep the main thread as the only writer."

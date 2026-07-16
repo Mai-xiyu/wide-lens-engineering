@@ -902,6 +902,8 @@ def run_cli_oracles() -> list[dict[str, Any]]:
     shipping_paths = [
         SKILL_DIR / "SKILL.md",
         SKILL_DIR / "README.md",
+        SKILL_DIR / "agents" / "openai.yaml",
+        SKILL_DIR / "references" / "practical.md",
         SKILL_DIR / "references" / "protocol.md",
         SKILL_DIR / "scripts" / "diverge.py",
         SKILL_DIR / "scripts" / "check_delivery.py",
@@ -1521,6 +1523,92 @@ def run_security_regressions() -> list[dict[str, Any]]:
     return results
 
 
+def run_workflow_routing_regressions() -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    skill = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    practical = (SKILL_DIR / "references" / "practical.md").read_text(encoding="utf-8")
+    protocol = (SKILL_DIR / "references" / "protocol.md").read_text(encoding="utf-8")
+    openai_yaml = (SKILL_DIR / "agents" / "openai.yaml").read_text(encoding="utf-8")
+    skill_folded = skill.casefold()
+    practical_folded = practical.casefold()
+
+    def record(name: str, passed: bool, detail: str) -> None:
+        results.append({"kind": "workflow-policy-static", "name": name, "passed": passed, "detail": detail})
+
+    axes = (
+        "`assurance`: `practical | assured`",
+        "`depth`: `focused | full`",
+        "`coordination`: `independent | shared`",
+    )
+    record(
+        "workflow axes are explicit and orthogonal",
+        all(item in skill for item in axes) and "Depth does not choose assurance or coordination." in skill,
+        f"missing={[item for item in axes if item not in skill]}",
+    )
+
+    hard_routes = (
+        "security", "credential", "schema-migration", "concurrency",
+        "public-api", "deployment", "irreversible", "uncertain",
+        "never silently downgrade",
+    )
+    record(
+        "high-impact work cannot silently remain practical",
+        all(item in skill_folded for item in hard_routes),
+        f"missing={[item for item in hard_routes if item not in skill_folded]}",
+    )
+
+    assured_flags = ("--capture-baseline", "--expect-packet-sha256", "--runtime-receipt")
+    record(
+        "progressive disclosure keeps assured CLI details out of the router",
+        "references/practical.md" in skill
+        and "references/protocol.md" in skill
+        and "assurance=assured" in protocol
+        and not any(flag in skill for flag in assured_flags),
+        f"router_flags={[flag for flag in assured_flags if flag in skill]}",
+    )
+
+    practical_requirements = (
+        "git status --porcelain=v2 -z --untracked-files=all",
+        "git diff --check",
+        "git diff --cached --check",
+        "exact acceptance commands",
+        "actual diffs",
+        "immutable, controller-observed, attested, or supply-chain secure",
+    )
+    record(
+        "practical mode uses Git evidence without attestation claims",
+        all(item in practical_folded for item in practical_requirements)
+        and not any(flag in practical for flag in assured_flags),
+        f"missing={[item for item in practical_requirements if item not in practical_folded]}",
+    )
+
+    ownership = "The active main model alone decides whether to use subagents and, if used, their identities, count, and lane assignments."
+    record(
+        "runtime participant selection belongs to the active main model",
+        ownership in skill
+        and "$wide-lens-engineering" in openai_yaml
+        and all(item in openai_yaml for item in ("practical", "assured", "count", "read-only")),
+        "router or UI metadata lost dynamic main-model ownership",
+    )
+
+    independent = build_packet(valid_contract(), risk="medium", profile="full", coordination="independent")
+    shared = build_packet(valid_contract(), risk="medium", profile="full", coordination="shared")
+    expected = {
+        "independent": "34a3e742a4dda7300750dee230b03177ae7cfbc3be2c9997f7d52dbf11212962",
+        "shared": "b9d69a0bf86d7fc688fcab3694e8cb430c5b9a758af2aea4df2fa522603543d2",
+    }
+    observed = {
+        "independent": independent["packet_sha256"],
+        "shared": shared["packet_sha256"],
+    }
+    record(
+        "assured v4 packet bytes remain backward compatible",
+        observed == expected,
+        f"observed={observed}",
+    )
+    return results
+
+
 def threshold_arg(value: str) -> float:
     try:
         threshold = float(value)
@@ -1544,6 +1632,7 @@ def main() -> int:
     data = json.loads(args.cases.read_text(encoding="utf-8"))
     results = run_cli_oracles()
     results.extend(run_security_regressions())
+    results.extend(run_workflow_routing_regressions())
     for case in data.get("selection", []):
         passed, detail = run_selection_case(case)
         results.append({"kind": "selection", "name": case["name"], "passed": passed, "detail": detail})

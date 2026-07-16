@@ -1,4 +1,6 @@
-# Wide-Lens Engineering Protocol v4
+# Wide-Lens Engineering Assured Protocol v4
+
+This protocol applies only when the router selects `assurance=assured`. Practical work follows [practical.md](practical.md), emits none of these v4 artifacts, and must not claim this protocol's trust properties. Router labels such as `assurance` and `depth` are not v4 wire fields.
 
 This document is the normative artifact protocol implemented by `scripts/diverge.py` and `scripts/check_delivery.py`. It separates four roles:
 
@@ -253,7 +255,7 @@ The current gate reconstructs the entire packet before any acceptance command an
 
 - `version`: integer `4`.
 - `risk`: `low`, `medium`, or `high`.
-- `profile`: `light` or `full`; light is allowed only for low risk and cannot hide triggered lanes.
+- `profile`: `light` or `full`; light is allowed only for low risk and cannot hide triggered lanes. The router maps `depth=focused` to wire `light` only when coordination is independent and these conditions hold; otherwise it openly promotes the adapter to wire `full`. Both wire profiles remain assured and require the complete v4 lifecycle.
 - `coordination`: `independent` or `shared`; shared requires full.
 - `planner`: exactly `{seed, catalog_sha256}`; seed is non-empty and at most 256 characters.
 - `independence`: exactly `{hide_proposed_solution:true, hide_peer_outputs:true, single_editing_owner:true}`.
@@ -316,7 +318,9 @@ Shared `discussion` has exactly:
 }
 ```
 
-The byte limit applies to the sum of one participant's canonical Round 1 position objects. No aggregate participant-count or board-size budget exists.
+The byte limit applies to the sum of one participant's canonical Round 1 position objects. No aggregate participant-count or board-size budget exists in v4.
+
+A user, controller, or runtime may supply an external aggregate deadline, token, cost, or tool-call envelope. It is not a participant-count rule or v4 packet field: the active main model still chooses identities, count, and lanes within that envelope, and the Skill supplies neither a default envelope nor an algorithm that derives participant count from one.
 
 ### 5.2 Runtime prompt materialization
 
