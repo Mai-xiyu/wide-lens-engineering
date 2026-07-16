@@ -1,4 +1,4 @@
 interface:
   display_name: "Wide-Lens Review"
-  short_description: "Adversarial, evidence-gated review for complex work"
-  default_prompt: "Use $wide-lens-review to map this change, run independent review lenses, and verify the result."
+  short_description: "Evidence-gated independent and shared-agent review"
+  default_prompt: "Use $wide-lens-review to map this change, run sealed independent passes followed by shared peer challenge, and verify the result."

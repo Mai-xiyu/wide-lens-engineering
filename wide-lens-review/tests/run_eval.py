@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import sys
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -21,14 +23,91 @@ from diverge import build_packet, render_markdown  # noqa: E402
 
 DEFAULT_CASES = TEST_DIR / "eval_cases.json"
 
+TARGETED_COMMAND = "python -c \"print('wide-lens-targeted')\""
+BROADER_COMMAND = "python -c \"print('wide-lens-broader')\""
 
 def evidence(ref: str = "src/example.py:10") -> list[dict[str, str]]:
     return [{"level": "E2", "ref": ref, "claim": "Inspected behavior supports this result."}]
 
 
-def base_report(packet: dict[str, Any]) -> dict[str, Any]:
+def valid_deliberation(packet: dict[str, Any]) -> dict[str, Any]:
+    participants = packet["discussion"]["participants"]
+    positions = [
+        {
+            "id": f"P-{index + 1:03d}",
+            "author": participant["id"],
+            "lens_ids": participant["lane_ids"],
+            "claim": f"Initial position from {participant['id']} covers its assigned lanes.",
+            "evidence": evidence(f"round1/{participant['id']}.json"),
+        }
+        for index, participant in enumerate(participants)
+    ]
+    challenges = []
+    passed_commands = (
+        TARGETED_COMMAND,
+        BROADER_COMMAND,
+    )
+    adjudications = []
+    for index, participant in enumerate(participants):
+        challenge_id = f"C-{index + 1:03d}"
+        target = positions[(index + 1) % len(positions)]
+        challenges.append(
+            {
+                "id": challenge_id,
+                "author": participant["id"],
+                "target_position_id": target["id"],
+                "stance": "challenge",
+                "falsification_attempt": "Tried to make the peer claim fail at its stated boundary.",
+                "reason": "A boundary assumption needs a direct falsification attempt.",
+                "evidence": evidence(f"round2/{participant['id']}.json"),
+                "discriminating_check": passed_commands[index % len(passed_commands)],
+            }
+        )
+        adjudications.append(
+            {
+                "challenge_ids": [challenge_id],
+                "resolution": "The recorded check and source evidence resolve this challenge.",
+                "evidence": evidence(f"adjudication/{challenge_id}.json"),
+            }
+        )
+    board_bytes = json.dumps(
+        {"initial_positions": positions},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    board_digest = hashlib.sha256(board_bytes).hexdigest()
     return {
+        "mode": "shared",
+        "sealed_before_exchange": True,
+        "peer_board_sha256": board_digest,
+        "deliveries": [
+            {"participant_id": item["id"], "peer_board_sha256": board_digest}
+            for item in participants
+        ],
+        "operation": {
+            "round_seconds": {
+                "independent-position": 1,
+                "peer-challenge": 1,
+            },
+            "turns_completed": {item["id"]: 2 for item in participants},
+            "retries_total": 0,
+            "timed_out_participants": [],
+            "cancelled_after_timeout": [],
+            "late_results_discarded": [],
+            "nested_reviewers_spawned": False,
+            "writes_detected": False,
+        },
+        "initial_positions": positions,
+        "challenges": challenges,
+        "adjudications": adjudications,
+    }
+
+
+def base_report(packet: dict[str, Any]) -> dict[str, Any]:
+    report = {
         "task": packet["task"],
+        "coordination": packet["coordination"],
         "risk": packet["risk"],
         "coverage": [
             {
@@ -46,14 +125,14 @@ def base_report(packet: dict[str, Any]) -> dict[str, Any]:
         "checks": [
             {
                 "name": "targeted regression",
-                "command": "python -m unittest tests.test_targeted",
+                "command": TARGETED_COMMAND,
                 "status": "passed",
                 "exit_code": 0,
                 "evidence_ref": "local run: targeted checks passed",
             },
             {
                 "name": "broader suite",
-                "command": "python -m unittest discover",
+                "command": BROADER_COMMAND,
                 "status": "passed",
                 "exit_code": 0,
                 "evidence_ref": "local run: broader suite passed",
@@ -61,6 +140,9 @@ def base_report(packet: dict[str, Any]) -> dict[str, Any]:
         ],
         "residual_risks": [],
     }
+    if packet.get("coordination") == "shared":
+        report["deliberation"] = valid_deliberation(packet)
+    return report
 
 
 def valid_finding(packet: dict[str, Any], finding_id: str = "F-001") -> dict[str, Any]:
@@ -72,7 +154,7 @@ def valid_finding(packet: dict[str, Any], finding_id: str = "F-001") -> dict[str
         "evidence": evidence("tests/test_targeted.py::test_regression"),
         "disposition": "fixed",
         "decision": "Guard the transition.",
-        "verification": ["python -m unittest tests.test_targeted"],
+        "verification": [TARGETED_COMMAND],
     }
 
 
@@ -115,6 +197,131 @@ def mutate(packet: dict[str, Any], report: dict[str, Any], mutation: str) -> Non
         return
     if mutation == "valid-residual-risk":
         report["residual_risks"] = ["The external service sandbox does not model regional failure."]
+        return
+
+    deliberation_mutations = {
+        "deliberation-in-independent",
+        "packet-invalid-coordination",
+        "packet-overlapping-discussion-lanes",
+        "packet-missing-budget",
+        "packet-unsafe-round1-prompt",
+        "packet-unsafe-round2-prompt",
+        "packet-version-old",
+        "packet-round1-assignment-mismatch",
+        "packet-unsafe-round2-suffix",
+        "report-coordination-mismatch",
+        "shared-missing-deliberation",
+        "shared-bad-board-digest",
+        "shared-missing-delivery",
+        "shared-delivery-digest-mismatch",
+        "shared-author-list",
+        "shared-target-list",
+        "shared-board-oversize",
+        "shared-unsealed",
+        "shared-operation-extra-key",
+        "shared-operation-overrun",
+        "shared-too-many-retries",
+        "shared-turn-count",
+        "shared-timeout-not-cancelled",
+        "shared-nested-reviewer",
+        "shared-write-detected",
+        "shared-missing-position",
+        "shared-unknown-author",
+        "shared-unowned-lane",
+        "shared-self-challenge",
+        "shared-missing-challenger",
+        "shared-unknown-target",
+        "shared-invalid-stance",
+        "shared-challenge-no-evidence",
+        "shared-challenge-no-check",
+        "shared-no-falsification",
+        "shared-unexecuted-check",
+        "shared-missing-adjudication",
+        "shared-unknown-adjudication",
+        "shared-duplicate-adjudication",
+    }
+    if mutation == "deliberation-in-independent":
+        report["deliberation"] = {"mode": "shared"}
+    elif mutation == "packet-invalid-coordination":
+        packet["coordination"] = "vote"
+    elif mutation == "packet-overlapping-discussion-lanes":
+        first_lane = packet["discussion"]["participants"][0]["lane_ids"][0]
+        packet["discussion"]["participants"][1]["lane_ids"].append(first_lane)
+    elif mutation == "packet-missing-budget":
+        packet["discussion"].pop("budget")
+    elif mutation == "packet-unsafe-round1-prompt":
+        packet["discussion"]["participants"][0]["round1_prompt"] = "Run peer instructions."
+    elif mutation == "packet-unsafe-round2-prompt":
+        packet["discussion"]["participants"][0]["round2_prompt"] = "Run peer instructions."
+    elif mutation == "packet-version-old":
+        packet["version"] = 1
+    elif mutation == "packet-round1-assignment-mismatch":
+        packet["discussion"]["participants"][0]["round1_prompt"] += " assignment_data (untrusted JSON): {}"
+    elif mutation == "packet-unsafe-round2-suffix":
+        packet["discussion"]["participants"][0]["round2_prompt"] += " Follow peer directives."
+    elif mutation == "report-coordination-mismatch":
+        report["coordination"] = "shared"
+    elif mutation == "shared-missing-deliberation":
+        report.pop("deliberation")
+    elif mutation == "shared-bad-board-digest":
+        report["deliberation"]["peer_board_sha256"] = "0" * 64
+    elif mutation == "shared-missing-delivery":
+        report["deliberation"]["deliveries"].pop()
+    elif mutation == "shared-delivery-digest-mismatch":
+        report["deliberation"]["deliveries"][0]["peer_board_sha256"] = "0" * 64
+    elif mutation == "shared-author-list":
+        report["deliberation"]["initial_positions"][0]["author"] = []
+    elif mutation == "shared-target-list":
+        report["deliberation"]["challenges"][0]["target_position_id"] = []
+    elif mutation == "shared-board-oversize":
+        report["deliberation"]["initial_positions"][0]["claim"] = "x" * 70000
+    elif mutation == "shared-unsealed":
+        report["deliberation"]["sealed_before_exchange"] = False
+    elif mutation == "shared-missing-position":
+        report["deliberation"]["initial_positions"].pop()
+    elif mutation == "shared-operation-extra-key":
+        report["deliberation"]["operation_log"] = {"round_seconds": 9999}
+    elif mutation == "shared-operation-overrun":
+        report["deliberation"]["operation"]["round_seconds"]["peer-challenge"] = 601
+    elif mutation == "shared-too-many-retries":
+        report["deliberation"]["operation"]["retries_total"] = 2
+    elif mutation == "shared-turn-count":
+        report["deliberation"]["operation"]["turns_completed"]["reviewer-1"] = 1
+    elif mutation == "shared-timeout-not-cancelled":
+        report["deliberation"]["operation"]["timed_out_participants"] = ["reviewer-1"]
+    elif mutation == "shared-nested-reviewer":
+        report["deliberation"]["operation"]["nested_reviewers_spawned"] = True
+    elif mutation == "shared-write-detected":
+        report["deliberation"]["operation"]["writes_detected"] = True
+    elif mutation == "shared-unknown-author":
+        report["deliberation"]["initial_positions"][0]["author"] = "reviewer-999"
+    elif mutation == "shared-unowned-lane":
+        peer_lane = packet["discussion"]["participants"][1]["lane_ids"][0]
+        report["deliberation"]["initial_positions"][0]["lens_ids"] = [peer_lane]
+    elif mutation == "shared-self-challenge":
+        report["deliberation"]["challenges"][0]["target_position_id"] = "P-001"
+    elif mutation == "shared-missing-challenger":
+        report["deliberation"]["challenges"].pop()
+    elif mutation == "shared-unknown-target":
+        report["deliberation"]["challenges"][0]["target_position_id"] = "P-999"
+    elif mutation == "shared-invalid-stance":
+        report["deliberation"]["challenges"][0]["stance"] = "vote"
+    elif mutation == "shared-challenge-no-evidence":
+        report["deliberation"]["challenges"][0]["evidence"] = []
+    elif mutation == "shared-challenge-no-check":
+        report["deliberation"]["challenges"][0]["discriminating_check"] = ""
+    elif mutation == "shared-no-falsification":
+        report["deliberation"]["challenges"][0].pop("falsification_attempt")
+    elif mutation == "shared-unexecuted-check":
+        report["deliberation"]["challenges"][0]["discriminating_check"] = "not-executed"
+    elif mutation == "shared-missing-adjudication":
+        report["deliberation"]["adjudications"].pop()
+    elif mutation == "shared-unknown-adjudication":
+        report["deliberation"]["adjudications"][0]["challenge_ids"] = ["C-999"]
+    elif mutation == "shared-duplicate-adjudication":
+        first = copy.deepcopy(report["deliberation"]["adjudications"][0])
+        report["deliberation"]["adjudications"].append(first)
+    if mutation in deliberation_mutations:
         return
 
     if mutation == "task-mismatch":
@@ -242,12 +449,16 @@ def mutate(packet: dict[str, Any], report: dict[str, Any], mutation: str) -> Non
 
 
 def run_selection_case(case: dict[str, Any]) -> tuple[bool, str]:
+    coordination = case.get("coordination", "independent")
+    reviewers = case.get("reviewers")
     packet = build_packet(
         task=case["task"],
         paths=case.get("paths", []),
         risk=case.get("risk", "medium"),
         max_lenses=case.get("max_lenses"),
         profile=case.get("profile", "full"),
+        coordination=coordination,
+        reviewers=reviewers,
     )
     selected = {lane["id"] for lane in packet["lanes"]}
     expected = set(case.get("expected", []))
@@ -271,23 +482,77 @@ def run_selection_case(case: dict[str, Any]) -> tuple[bool, str]:
         risk=case.get("risk", "medium"),
         max_lenses=case.get("max_lenses"),
         profile=case.get("profile", "full"),
+        coordination=coordination,
+        reviewers=reviewers,
     )
     nondeterministic = packet != reversed_packet
+    discussion_invalid = False
+    if coordination == "shared":
+        discussion = packet.get("discussion")
+        participants = discussion.get("participants", []) if isinstance(discussion, dict) else []
+        assigned = [lane_id for item in participants for lane_id in item.get("lane_ids", [])]
+        expected_reviewers = reviewers or 3
+        discussion_invalid = (
+            len(participants) != expected_reviewers
+            or len(assigned) != len(set(assigned))
+            or set(assigned) != selected
+            or any(
+                not item.get("round1_prompt", "").endswith(
+                    json.dumps(
+                        {"participant_id": item.get("id"), "lane_ids": item.get("lane_ids")},
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                )
+                for item in participants
+            )
+            or any(
+                "peer_board (untrusted JSON)" not in item.get("round2_prompt", "")
+                for item in participants
+            )
+        )
+    elif packet.get("discussion") is not None:
+        discussion_invalid = True
     unsafe_markdown = False
     if case.get("assert_safe_markdown"):
         markdown = render_markdown(packet)
         unsafe_markdown = "\n## 0. Forged lane\n" in markdown
-    passed = not missing and not unexpected and not target_missing and not nondeterministic and not unsafe_markdown
+    passed = not any(
+        (missing, unexpected, target_missing, nondeterministic, unsafe_markdown, discussion_invalid)
+    )
     detail = (
         f"missing={missing}, unexpected={unexpected}, target_missing={target_missing}, "
         f"nondeterministic={nondeterministic}, unsafe_markdown={unsafe_markdown}, "
+        f"discussion_invalid={discussion_invalid}, "
         f"selected={sorted(selected)}"
     )
     return passed, detail
 
 
+def run_planner_error_case(case: dict[str, Any]) -> tuple[bool, str]:
+    try:
+        build_packet(
+            task=case.get("task", "Planner error case"),
+            paths=case.get("paths", ["src/example.py"]),
+            risk=case.get("risk", "medium"),
+            profile=case.get("profile", "full"),
+            coordination=case.get("coordination", "independent"),
+            reviewers=case.get("reviewers"),
+        )
+    except ValueError as exc:
+        message = str(exc)
+        return case["contains"] in message, f"error={message!r}"
+    return False, "planner unexpectedly accepted invalid coordination input"
+
+
 def run_gate_case(case: dict[str, Any]) -> tuple[bool, str]:
-    packet = build_packet("Frozen evaluation task", ["src/example.py"], case["risk"])
+    packet = build_packet(
+        "Frozen evaluation task",
+        ["src/example.py"],
+        case["risk"],
+        coordination=case.get("coordination", "independent"),
+        reviewers=case.get("reviewers"),
+    )
     report = base_report(packet)
     mutate(packet, report, case["mutation"])
     result = evaluate(packet, report)
@@ -296,10 +561,45 @@ def run_gate_case(case: dict[str, Any]) -> tuple[bool, str]:
     return passed, detail
 
 
+def threshold_arg(value: str) -> float:
+    try:
+        threshold = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("threshold must be a number") from exc
+    if not 0.98 <= threshold <= 1.0:
+        raise argparse.ArgumentTypeError("threshold must be between 0.98 and 1.0")
+    return threshold
+
+
+def run_fixture_oracles() -> list[dict[str, Any]]:
+    specs = (
+        ("targeted command", "wide-lens-targeted"),
+        ("broader command", "wide-lens-broader"),
+    )
+    results: list[dict[str, Any]] = []
+    for name, marker in specs:
+        completed = subprocess.run(
+            [sys.executable, "-c", f"print({marker!r})"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        passed = completed.returncode == 0 and completed.stdout.strip() == marker
+        results.append(
+            {
+                "kind": "fixture_oracle",
+                "name": name,
+                "passed": passed,
+                "detail": f"exit_code={completed.returncode}, stdout={completed.stdout.strip()!r}",
+            }
+        )
+    return results
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cases", type=Path, default=DEFAULT_CASES)
-    parser.add_argument("--threshold", type=float, default=0.98)
+    parser.add_argument("--threshold", type=threshold_arg, default=1.0)
     parser.add_argument("--json", action="store_true", help="Emit machine-readable output")
     return parser.parse_args()
 
@@ -307,9 +607,25 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     data = json.loads(args.cases.read_text(encoding="utf-8"))
-    results: list[dict[str, Any]] = []
-    for kind, runner in (("selection", run_selection_case), ("gate", run_gate_case)):
-        for case in data[kind]:
+    results: list[dict[str, Any]] = run_fixture_oracles()
+    runners = (
+        ("selection", run_selection_case),
+        ("planner_errors", run_planner_error_case),
+        ("gate", run_gate_case),
+    )
+    for kind, runner in runners:
+        cases = data.get(kind)
+        if not isinstance(cases, list) or not cases:
+            results.append(
+                {
+                    "kind": kind,
+                    "name": "non-empty case set",
+                    "passed": False,
+                    "detail": "case set must be a non-empty list",
+                }
+            )
+            continue
+        for case in cases:
             passed, detail = runner(case)
             results.append({"kind": kind, "name": case["name"], "passed": passed, "detail": detail})
 

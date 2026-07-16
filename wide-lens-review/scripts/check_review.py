@@ -5,9 +5,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import hashlib
 from collections import Counter
 from pathlib import Path
 from typing import Any
+from diverge import build_participant_prompts
+
 
 
 VALID_LEVELS = {"E1", "E2", "E3"}
@@ -17,7 +20,19 @@ VALID_DISPOSITIONS = {"fixed", "accepted", "not-applicable", "open"}
 VALID_CHECK_STATUSES = {"passed", "failed", "not-run"}
 VALID_RISKS = {"low", "medium", "high"}
 VALID_PROFILES = {"light", "full"}
+VALID_COORDINATION = {"independent", "shared"}
+VALID_STANCES = {"support", "challenge", "uncertain"}
 PLACEHOLDERS = {".", "-", "n/a", "na", "none", "unknown", "tbd"}
+
+EXPECTED_DISCUSSION_BUDGET = {
+    "max_participants": 3,
+    "max_turns_per_participant": 2,
+    "max_round_seconds": 600,
+    "max_retries_total": 1,
+    "max_peer_board_bytes": 65536,
+    "allow_nested_reviewers": False,
+    "allow_writes": False,
+}
 
 
 def _nonempty_string(value: Any) -> bool:
@@ -26,6 +41,10 @@ def _nonempty_string(value: Any) -> bool:
 
 def _concrete_string(value: Any) -> bool:
     return _nonempty_string(value) and value.strip().casefold() not in PLACEHOLDERS
+
+def _one_of(value: Any, allowed: set[str]) -> bool:
+    return isinstance(value, str) and value in allowed
+
 
 
 def _string_list(value: Any, minimum: int = 1) -> bool:
@@ -45,12 +64,350 @@ def _validate_evidence(value: Any, location: str, errors: list[str]) -> None:
         if not isinstance(item, dict):
             errors.append(f"{item_location}: must be an object")
             continue
-        if item.get("level") not in VALID_LEVELS:
+        if not _one_of(item.get("level"), VALID_LEVELS):
             errors.append(f"{item_location}.level: expected one of {sorted(VALID_LEVELS)}")
         if not _concrete_string(item.get("ref")):
             errors.append(f"{item_location}.ref: must be concrete, not empty or a placeholder")
         if not _concrete_string(item.get("claim")):
             errors.append(f"{item_location}.claim: must be concrete, not empty or a placeholder")
+
+
+def _canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+
+
+def _packet_participants(
+    packet: dict[str, Any], expected_lanes: set[str], errors: list[str]
+) -> dict[str, set[str]]:
+    coordination = packet.get("coordination")
+    discussion = packet.get("discussion")
+    if not _one_of(coordination, VALID_COORDINATION):
+        errors.append(f"packet.coordination: expected one of {sorted(VALID_COORDINATION)}")
+        return {}
+    if coordination == "independent":
+        if discussion is not None:
+            errors.append("packet.discussion: independent coordination requires null")
+        return {}
+    if packet.get("profile") != "full":
+        errors.append("packet.coordination: shared coordination requires the full profile")
+    if not isinstance(discussion, dict):
+        errors.append("packet.discussion: shared coordination requires an object")
+        return {}
+    if discussion.get("mode") != "shared":
+        errors.append("packet.discussion.mode: must be shared")
+    if discussion.get("sealed_round1") is not True:
+        errors.append("packet.discussion.sealed_round1: must be true")
+    expected_rounds = ["independent-position", "peer-challenge", "evidence-adjudication"]
+    if discussion.get("rounds") != expected_rounds:
+        errors.append(f"packet.discussion.rounds: must equal {expected_rounds}")
+    if discussion.get("relay") != (
+        "Main thread relays the complete structured peer board between the same participants."
+    ):
+        errors.append("packet.discussion.relay: must preserve the complete board for every participant")
+    if discussion.get("adjudicator") != "main-thread":
+        errors.append("packet.discussion.adjudicator: must be main-thread")
+    if discussion.get("decision_rule") != "Resolve claims by discriminating evidence, never by vote or confidence.":
+        errors.append("packet.discussion.decision_rule: must be evidence-based and non-voting")
+    if discussion.get("budget") != EXPECTED_DISCUSSION_BUDGET:
+        errors.append("packet.discussion.budget: must match the bounded execution policy")
+    participants = discussion.get("participants")
+    if not isinstance(participants, list) or not 2 <= len(participants) <= 3:
+        errors.append("packet.discussion.participants: must contain 2 or 3 participants")
+        return {}
+    assignments: dict[str, set[str]] = {}
+    assigned_lanes: list[str] = []
+    for index, participant in enumerate(participants):
+        location = f"packet.discussion.participants[{index}]"
+        if not isinstance(participant, dict):
+            errors.append(f"{location}: must be an object")
+            continue
+        participant_id = participant.get("id")
+        if not _nonempty_string(participant_id):
+            errors.append(f"{location}.id: must be non-empty")
+            continue
+        if participant_id in assignments:
+            errors.append(f"{location}.id: duplicate participant id")
+            continue
+        lane_ids = participant.get("lane_ids")
+        if not _string_list(lane_ids):
+            errors.append(f"{location}.lane_ids: must be a non-empty string list")
+            assignments[participant_id] = set()
+        else:
+            lane_set = set(lane_ids)
+            if len(lane_ids) != len(lane_set):
+                errors.append(f"{location}.lane_ids: duplicate lane ids")
+            unknown = sorted(lane_set - expected_lanes)
+            if unknown:
+                errors.append(f"{location}.lane_ids: unknown lanes {unknown}")
+            assignments[participant_id] = lane_set
+            assigned_lanes.extend(lane_ids)
+        round1_prompt = participant.get("round1_prompt")
+        round2_prompt = participant.get("round2_prompt")
+        if _string_list(lane_ids):
+            expected_round1, expected_round2 = build_participant_prompts(participant_id, lane_ids)
+            if round1_prompt != expected_round1:
+                errors.append(f"{location}.round1_prompt: must match the canonical assignment prompt")
+            if round2_prompt != expected_round2:
+                errors.append(f"{location}.round2_prompt: must match the canonical relay prompt")
+    duplicate_lanes = sorted(item for item, count in Counter(assigned_lanes).items() if count > 1)
+    if duplicate_lanes:
+        errors.append(f"packet.discussion.participants: lanes assigned more than once {duplicate_lanes}")
+    missing_lanes = sorted(expected_lanes - set(assigned_lanes))
+    if missing_lanes:
+        errors.append(f"packet.discussion.participants: unassigned lanes {missing_lanes}")
+    return assignments
+
+def _validate_operation(
+    value: Any, assignments: dict[str, set[str]], errors: list[str]
+) -> None:
+    location = "report.deliberation.operation"
+    if not isinstance(value, dict):
+        errors.append(f"{location}: must be an object")
+        return
+    expected_keys = {
+        "round_seconds",
+        "turns_completed",
+        "retries_total",
+        "timed_out_participants",
+        "cancelled_after_timeout",
+        "late_results_discarded",
+        "nested_reviewers_spawned",
+        "writes_detected",
+    }
+    if set(value) != expected_keys:
+        errors.append(f"{location}: keys must equal {sorted(expected_keys)}")
+    round_seconds = value.get("round_seconds")
+    expected_rounds = {"independent-position", "peer-challenge"}
+    if not isinstance(round_seconds, dict) or set(round_seconds) != expected_rounds:
+        errors.append(f"{location}.round_seconds: must record both reviewer rounds")
+    else:
+        for round_name, seconds in round_seconds.items():
+            if (
+                not isinstance(seconds, int)
+                or isinstance(seconds, bool)
+                or not 0 <= seconds <= EXPECTED_DISCUSSION_BUDGET["max_round_seconds"]
+            ):
+                errors.append(f"{location}.round_seconds.{round_name}: outside the budget")
+    turns = value.get("turns_completed")
+    if not isinstance(turns, dict) or set(turns) != set(assignments):
+        errors.append(f"{location}.turns_completed: must cover every participant exactly once")
+    else:
+        for participant_id, count in turns.items():
+            if count != EXPECTED_DISCUSSION_BUDGET["max_turns_per_participant"]:
+                errors.append(f"{location}.turns_completed.{participant_id}: must equal 2")
+    retries = value.get("retries_total")
+    if (
+        not isinstance(retries, int)
+        or isinstance(retries, bool)
+        or not 0 <= retries <= EXPECTED_DISCUSSION_BUDGET["max_retries_total"]
+    ):
+        errors.append(f"{location}.retries_total: outside the budget")
+
+    participant_lists: dict[str, set[str]] = {}
+    for field in (
+        "timed_out_participants",
+        "cancelled_after_timeout",
+        "late_results_discarded",
+    ):
+        items = value.get(field)
+        if not isinstance(items, list) or not all(
+            _nonempty_string(item) and item in assignments for item in items
+        ):
+            errors.append(f"{location}.{field}: must be a participant-id list")
+            participant_lists[field] = set()
+        else:
+            participant_lists[field] = set(items)
+            if len(items) != len(participant_lists[field]):
+                errors.append(f"{location}.{field}: duplicate participant ids")
+    timed_out = participant_lists["timed_out_participants"]
+    if participant_lists["cancelled_after_timeout"] != timed_out:
+        errors.append(f"{location}.cancelled_after_timeout: must exactly match timed-out participants")
+    if not participant_lists["late_results_discarded"] <= timed_out:
+        errors.append(f"{location}.late_results_discarded: must reference timed-out participants")
+    if value.get("nested_reviewers_spawned") is not False:
+        errors.append(f"{location}.nested_reviewers_spawned: must be false")
+    if value.get("writes_detected") is not False:
+        errors.append(f"{location}.writes_detected: must be false")
+
+
+
+def _validate_deliberation(
+    value: Any,
+    assignments: dict[str, set[str]],
+    expected_lanes: set[str],
+    errors: list[str],
+) -> list[tuple[str, str]]:
+    challenge_checks: list[tuple[str, str]] = []
+    if not isinstance(value, dict):
+        errors.append("report.deliberation: shared coordination requires an object")
+        return challenge_checks
+    if value.get("mode") != "shared":
+        errors.append("report.deliberation.mode: must be shared")
+    if value.get("sealed_before_exchange") is not True:
+        errors.append("report.deliberation.sealed_before_exchange: must be true")
+    expected_keys = {
+        "mode",
+        "sealed_before_exchange",
+        "peer_board_sha256",
+        "deliveries",
+        "initial_positions",
+        "challenges",
+        "adjudications",
+        "operation",
+    }
+    if set(value) != expected_keys:
+        errors.append(f"report.deliberation: keys must equal {sorted(expected_keys)}")
+    _validate_operation(value.get("operation"), assignments, errors)
+
+
+    positions = value.get("initial_positions")
+    if not isinstance(positions, list) or not positions:
+        errors.append("report.deliberation.initial_positions: must be a non-empty list")
+        positions = []
+    board_bytes = _canonical_json_bytes({"initial_positions": positions})
+    board_digest = hashlib.sha256(board_bytes).hexdigest()
+    if len(board_bytes) > EXPECTED_DISCUSSION_BUDGET["max_peer_board_bytes"]:
+        errors.append("report.deliberation.initial_positions: peer board exceeds the byte limit")
+    if value.get("peer_board_sha256") != board_digest:
+        errors.append("report.deliberation.peer_board_sha256: must match the canonical position board")
+    deliveries = value.get("deliveries")
+    if not isinstance(deliveries, list):
+        errors.append("report.deliberation.deliveries: must be a list")
+        deliveries = []
+    delivered_to: list[str] = []
+    for index, delivery in enumerate(deliveries):
+        location = f"report.deliberation.deliveries[{index}]"
+        if not isinstance(delivery, dict):
+            errors.append(f"{location}: must be an object")
+            continue
+        participant_id = delivery.get("participant_id")
+        if not _nonempty_string(participant_id) or participant_id not in assignments:
+            errors.append(f"{location}.participant_id: must reference a discussion participant")
+        else:
+            delivered_to.append(participant_id)
+        if delivery.get("peer_board_sha256") != board_digest:
+            errors.append(f"{location}.peer_board_sha256: must match the canonical position board")
+    duplicate_deliveries = sorted(
+        item for item, count in Counter(delivered_to).items() if count > 1
+    )
+    if duplicate_deliveries:
+        errors.append(f"report.deliberation.deliveries: duplicate participants {duplicate_deliveries}")
+    missing_deliveries = sorted(set(assignments) - set(delivered_to))
+    if missing_deliveries:
+        errors.append(f"report.deliberation.deliveries: missing participants {missing_deliveries}")
+    position_authors: dict[str, str] = {}
+    position_lanes: set[str] = set()
+    authors_with_positions: set[str] = set()
+    for index, position in enumerate(positions):
+        location = f"report.deliberation.initial_positions[{index}]"
+        if not isinstance(position, dict):
+            errors.append(f"{location}: must be an object")
+            continue
+        position_id = position.get("id")
+        author = position.get("author")
+        if not _nonempty_string(position_id):
+            errors.append(f"{location}.id: must be non-empty")
+        elif position_id in position_authors:
+            errors.append(f"{location}.id: duplicate position id")
+        elif _nonempty_string(author) and author in assignments:
+            position_authors[position_id] = author
+        if not _nonempty_string(author) or author not in assignments:
+            errors.append(f"{location}.author: must reference a discussion participant")
+        else:
+            authors_with_positions.add(author)
+        lens_ids = position.get("lens_ids")
+        if not _string_list(lens_ids):
+            errors.append(f"{location}.lens_ids: must be a non-empty string list")
+        elif _nonempty_string(author) and author in assignments:
+            lens_set = set(lens_ids)
+            unowned = sorted(lens_set - assignments[author])
+            if unowned:
+                errors.append(f"{location}.lens_ids: author does not own lanes {unowned}")
+            position_lanes.update(lens_set)
+        if not _concrete_string(position.get("claim")):
+            errors.append(f"{location}.claim: must be concrete")
+        _validate_evidence(position.get("evidence"), location, errors)
+    missing_authors = sorted(set(assignments) - authors_with_positions)
+    if missing_authors:
+        errors.append(f"report.deliberation.initial_positions: participants without a position {missing_authors}")
+    missing_position_lanes = sorted(expected_lanes - position_lanes)
+    if missing_position_lanes:
+        errors.append(f"report.deliberation.initial_positions: uncovered lanes {missing_position_lanes}")
+
+    challenges = value.get("challenges")
+    if not isinstance(challenges, list) or not challenges:
+        errors.append("report.deliberation.challenges: must be a non-empty list")
+        challenges = []
+    challenge_ids: set[str] = set()
+    challenge_authors: set[str] = set()
+    for index, challenge in enumerate(challenges):
+        location = f"report.deliberation.challenges[{index}]"
+        if not isinstance(challenge, dict):
+            errors.append(f"{location}: must be an object")
+            continue
+        challenge_id = challenge.get("id")
+        author = challenge.get("author")
+        target_id = challenge.get("target_position_id")
+        if not _nonempty_string(challenge_id):
+            errors.append(f"{location}.id: must be non-empty")
+        elif challenge_id in challenge_ids:
+            errors.append(f"{location}.id: duplicate challenge id")
+        else:
+            challenge_ids.add(challenge_id)
+        if not _nonempty_string(author) or author not in assignments:
+            errors.append(f"{location}.author: must reference a discussion participant")
+        else:
+            challenge_authors.add(author)
+        if not _nonempty_string(target_id) or target_id not in position_authors:
+            errors.append(f"{location}.target_position_id: must reference an initial position")
+        elif position_authors[target_id] == author:
+            errors.append(f"{location}.target_position_id: must target a peer position")
+        if not _one_of(challenge.get("stance"), VALID_STANCES):
+            errors.append(f"{location}.stance: expected one of {sorted(VALID_STANCES)}")
+        if not _concrete_string(challenge.get("reason")):
+            errors.append(f"{location}.reason: must be concrete")
+        if not _concrete_string(challenge.get("falsification_attempt")):
+            errors.append(f"{location}.falsification_attempt: must be concrete")
+        _validate_evidence(challenge.get("evidence"), location, errors)
+        discriminating_check = challenge.get("discriminating_check")
+        if not _concrete_string(discriminating_check):
+            errors.append(f"{location}.discriminating_check: must be concrete")
+        else:
+            challenge_checks.append((location, discriminating_check))
+    missing_challengers = sorted(set(assignments) - challenge_authors)
+    if missing_challengers:
+        errors.append(f"report.deliberation.challenges: participants without a peer challenge {missing_challengers}")
+
+    adjudications = value.get("adjudications")
+    if not isinstance(adjudications, list) or not adjudications:
+        errors.append("report.deliberation.adjudications: must be a non-empty list")
+        adjudications = []
+    adjudicated: list[str] = []
+    for index, adjudication in enumerate(adjudications):
+        location = f"report.deliberation.adjudications[{index}]"
+        if not isinstance(adjudication, dict):
+            errors.append(f"{location}: must be an object")
+            continue
+        ids = adjudication.get("challenge_ids")
+        if not _string_list(ids):
+            errors.append(f"{location}.challenge_ids: must be a non-empty string list")
+        else:
+            adjudicated.extend(ids)
+            unknown = sorted(set(ids) - challenge_ids)
+            if unknown:
+                errors.append(f"{location}.challenge_ids: unknown challenges {unknown}")
+        if not _concrete_string(adjudication.get("resolution")):
+            errors.append(f"{location}.resolution: must be concrete")
+        _validate_evidence(adjudication.get("evidence"), location, errors)
+    duplicate_adjudications = sorted(item for item, count in Counter(adjudicated).items() if count > 1)
+    if duplicate_adjudications:
+        errors.append(f"report.deliberation.adjudications: duplicate challenge resolutions {duplicate_adjudications}")
+    unresolved = sorted(challenge_ids - set(adjudicated))
+    if unresolved:
+        errors.append(f"report.deliberation.adjudications: unresolved challenges {unresolved}")
+    return challenge_checks
 
 
 def evaluate(packet: Any, report: Any) -> dict[str, Any]:
@@ -70,14 +427,27 @@ def evaluate(packet: Any, report: Any) -> dict[str, Any]:
         return {"passed": False, "errors": ["packet.lanes: duplicate lane ids"]}
     expected_lanes = set(lane_ids)
 
+    if packet.get("version") != 2:
+        errors.append("packet.version: must be 2")
     packet_risk = packet.get("risk")
-    if packet_risk not in VALID_RISKS:
+    if not _one_of(packet_risk, VALID_RISKS):
         errors.append(f"packet.risk: expected one of {sorted(VALID_RISKS)}")
-    if packet.get("profile") not in VALID_PROFILES:
+    if not _one_of(packet.get("profile"), VALID_PROFILES):
         errors.append(f"packet.profile: expected one of {sorted(VALID_PROFILES)}")
     if packet.get("profile") == "light" and packet_risk != "low":
         errors.append("packet.profile: light is allowed only for low risk")
 
+    assignments = _packet_participants(packet, expected_lanes, errors)
+    deliberation_checks: list[tuple[str, str]] = []
+    if packet.get("coordination") == "shared":
+        deliberation_checks = _validate_deliberation(report.get("deliberation"), assignments, expected_lanes, errors)
+    elif report.get("deliberation") is not None:
+        errors.append(
+            "report.deliberation: allowed only when packet coordination is shared"
+        )
+
+    if report.get("coordination") != packet.get("coordination"):
+        errors.append("report.coordination: must exactly match packet.coordination")
     if report.get("task") != packet.get("task"):
         errors.append("report.task: must exactly match packet.task")
     if report.get("risk") != packet.get("risk"):
@@ -110,7 +480,7 @@ def evaluate(packet: Any, report: Any) -> dict[str, Any]:
             continue
         if not _nonempty_string(lane.get("lens_id")):
             errors.append(f"{location}.lens_id: must be a non-empty string")
-        if lane.get("status") not in VALID_LANE_STATUSES:
+        if not _one_of(lane.get("status"), VALID_LANE_STATUSES):
             errors.append(f"{location}.status: expected one of {sorted(VALID_LANE_STATUSES)}")
         elif lane["status"] == "blocked":
             errors.append(f"{location}.status: blocked lanes cannot pass")
@@ -141,17 +511,17 @@ def evaluate(packet: Any, report: Any) -> dict[str, Any]:
             finding_ids.append(finding["id"])
         if not _nonempty_string(finding.get("id")):
             errors.append(f"{location}.id: must be non-empty")
-        if finding.get("lens_id") not in expected_lanes:
+        if not _nonempty_string(finding.get("lens_id")) or finding.get("lens_id") not in expected_lanes:
             errors.append(f"{location}.lens_id: must reference an emitted lane")
         else:
             findings_by_lens[finding["lens_id"]] += 1
-        if finding.get("severity") not in VALID_SEVERITIES:
+        if not _one_of(finding.get("severity"), VALID_SEVERITIES):
             errors.append(f"{location}.severity: expected one of {sorted(VALID_SEVERITIES)}")
         if not _nonempty_string(finding.get("claim")):
             errors.append(f"{location}.claim: must be non-empty")
         _validate_evidence(finding.get("evidence"), location, errors)
         disposition = finding.get("disposition")
-        if disposition not in VALID_DISPOSITIONS:
+        if not _one_of(disposition, VALID_DISPOSITIONS):
             errors.append(f"{location}.disposition: expected one of {sorted(VALID_DISPOSITIONS)}")
         if disposition == "open" and finding.get("severity") in {"critical", "high"}:
             errors.append(f"{location}: critical/high findings cannot remain open")
@@ -228,7 +598,7 @@ def evaluate(packet: Any, report: Any) -> dict[str, Any]:
         )
         if not valid_exit_code:
             errors.append(f"{location}.exit_code: must be an integer or null")
-        if status not in VALID_CHECK_STATUSES:
+        if not _one_of(status, VALID_CHECK_STATUSES):
             errors.append(f"{location}.status: expected one of {sorted(VALID_CHECK_STATUSES)}")
         elif status == "passed":
             if exit_code != 0:
@@ -254,6 +624,10 @@ def evaluate(packet: Any, report: Any) -> dict[str, Any]:
             f"report.checks: need at least {minimum_passed} distinct passing check(s), "
             f"found {len(passed_commands)}"
         )
+
+    for location, command in deliberation_checks:
+        if command not in passed_commands:
+            errors.append(f"{location}.discriminating_check: must reference a passed check command")
 
     for location, commands in fixed_verifications:
         if not set(commands) & passed_commands:
