@@ -8,6 +8,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -902,6 +903,7 @@ def run_cli_oracles() -> list[dict[str, Any]]:
     shipping_paths = [
         SKILL_DIR / "SKILL.md",
         SKILL_DIR / "README.md",
+        SKILL_DIR / "README_CN.md",
         SKILL_DIR / "agents" / "openai.yaml",
         SKILL_DIR / "references" / "practical.md",
         SKILL_DIR / "references" / "protocol.md",
@@ -1609,6 +1611,201 @@ def run_workflow_routing_regressions() -> list[dict[str, Any]]:
     return results
 
 
+def run_readme_regressions() -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    english_path = SKILL_DIR / "README.md"
+    chinese_path = SKILL_DIR / "README_CN.md"
+    english = english_path.read_text(encoding="utf-8")
+    chinese = chinese_path.read_text(encoding="utf-8")
+
+    def record(name: str, passed: bool, detail: str) -> None:
+        results.append(
+            {
+                "kind": "documentation-static",
+                "name": name,
+                "passed": passed,
+                "detail": detail,
+            }
+        )
+
+    english_head = "\n".join(english.splitlines()[:6])
+    chinese_head = "\n".join(chinese.splitlines()[:6])
+    record(
+        "English README is primary and language links are reciprocal",
+        english.startswith("# Wide-Lens Engineering")
+        and "[简体中文](README_CN.md)" in english_head
+        and "[English](README.md)" in chinese_head
+        and "## Quick start" in english
+        and "## 快速开始" in chinese,
+        f"english_head={english_head!r} chinese_head={chinese_head!r}",
+    )
+
+    installer_request = (
+        "Use $skill-installer to install this GitHub skill:\n"
+        "repo: Mai-xiyu/wide-lens-engineering\n"
+        "path: .\n"
+        "name: wide-lens-engineering"
+    )
+    incomplete_installer_request = (
+        "$skill-installer install "
+        "https://github.com/Mai-xiyu/wide-lens-engineering"
+    )
+    record(
+        "bilingual Quick Start supplies the installer repository path",
+        installer_request in english
+        and installer_request in chinese
+        and incomplete_installer_request not in english
+        and incomplete_installer_request not in chinese,
+        "missing explicit repo/path/name or stale bare-URL invocation remains",
+    )
+
+    expected_sections = [
+        "overview",
+        "quick-start",
+        "how-it-works",
+        "practical",
+        "assured",
+        "shared-subagents",
+        "ponytail",
+        "examples",
+        "trust-boundaries",
+        "installation",
+        "testing",
+        "repository-map",
+        "references",
+    ]
+    marker_pattern = re.compile(r"<!-- section:([a-z0-9-]+) -->")
+    english_sections = marker_pattern.findall(english)
+    chinese_sections = marker_pattern.findall(chinese)
+    record(
+        "bilingual README section order stays synchronized",
+        english_sections == expected_sections and chinese_sections == expected_sections,
+        f"english={english_sections} chinese={chinese_sections}",
+    )
+
+    invariant_tokens = (
+        "practical",
+        "assured",
+        "focused",
+        "full",
+        "independent",
+        "shared",
+        "$wide-lens-engineering",
+        "baseline manifest v2",
+        "packet v4",
+        "not-needed",
+        "reuse",
+        "stdlib",
+        "native",
+        "existing-dependency",
+        "minimal-custom",
+    )
+    missing_invariants = [
+        token
+        for token in invariant_tokens
+        if token not in english or token not in chinese
+    ]
+    record(
+        "bilingual README preserves protocol and minimalism invariants",
+        not missing_invariants,
+        f"missing={missing_invariants}",
+    )
+
+
+    expected_invariant_markers = [
+        "assured-external-trust-root",
+        "axes-independent",
+        "main-model-selects-subagents",
+        "no-fixed-participant-count",
+        "subagents-read-only",
+        "no-recursive-delegation",
+        "main-thread-only-writer",
+    ]
+    invariant_pattern = re.compile(r"<!-- invariant:([a-z0-9-]+) -->")
+    english_required = (
+        "Every task selects one intent and three independent axes.",
+        "`full` does not automatically mean `assured`. `assured` does not automatically require `shared`.",
+        "The **active main model alone** decides whether subagents add value and, if used, their identities, count, and lane assignments.",
+        "The skill contains no exact, default, or maximum participant count.",
+        "Subagents remain read-only, recursive delegation is forbidden, and the main thread is the only writer and integrator.",
+        "Without a real external controller, independent digest channel, pinned verifier, isolated artifacts, and OS sandbox, the skill must report that assured preconditions are unmet.",
+    )
+    chinese_required = (
+        "每个任务分别选择一个 intent 和三个互相独立的轴。",
+        "`full` 不自动等于 `assured`，`assured` 也不自动要求 `shared`。",
+        "是否需要 subagent，以及采用哪些身份、数量和 lane assignments，**只由当前主模型**决定。",
+        "Skill 不包含精确、默认或最大参与者数量。",
+        "Subagent 保持只读，禁止递归委派，主线程是唯一写入者和集成者。",
+        "缺少真实外部 controller、独立摘要通道、固定 verifier、隔离工件和 OS sandbox 时，Skill 必须报告 assured 前置条件不成立。",
+    )
+
+    def clauses_hold(markdown: str, clauses: tuple[str, ...]) -> bool:
+        return all(clause in markdown for clause in clauses)
+
+    mutation_guards_hold = all(
+        not clauses_hold(english.replace(clause, "", 1), english_required)
+        for clause in english_required
+    ) and all(
+        not clauses_hold(chinese.replace(clause, "", 1), chinese_required)
+        for clause in chinese_required
+    )
+    record(
+        "critical bilingual invariants are exact and mutation-sensitive",
+        invariant_pattern.findall(english) == expected_invariant_markers
+        and invariant_pattern.findall(chinese) == expected_invariant_markers
+        and clauses_hold(english, english_required)
+        and clauses_hold(chinese, chinese_required)
+        and mutation_guards_hold,
+        "critical marker, clause, or negative-mutation guard failed",
+    )
+
+    def path_case_is_exact(path: Path) -> bool:
+        root = SKILL_DIR.resolve()
+        try:
+            relative = path.relative_to(root)
+        except ValueError:
+            return False
+        cursor = root
+        for part in relative.parts:
+            if part not in {entry.name for entry in cursor.iterdir()}:
+                return False
+            cursor /= part
+        return True
+
+    def broken_local_links(source: Path, markdown: str) -> list[str]:
+        broken: list[str] = []
+        for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", markdown):
+            target = target.strip()
+            if target.startswith(("http://", "https://", "mailto:")):
+                continue
+            path_text, _, fragment = target.partition("#")
+            resolved = (
+                source.resolve()
+                if not path_text
+                else (source.parent / path_text).resolve()
+            )
+            if not resolved.exists() or not path_case_is_exact(resolved):
+                broken.append(target)
+                continue
+            if fragment:
+                linked_text = resolved.read_text(encoding="utf-8")
+                anchors = set(re.findall(r'<a id="([^"]+)"></a>', linked_text))
+                if fragment not in anchors:
+                    broken.append(target)
+        return broken
+
+    broken = {
+        "README.md": broken_local_links(english_path, english),
+        "README_CN.md": broken_local_links(chinese_path, chinese),
+    }
+    record(
+        "bilingual README local links resolve with exact path case",
+        not any(broken.values()),
+        f"broken={broken}",
+    )
+    return results
+
+
 def threshold_arg(value: str) -> float:
     try:
         threshold = float(value)
@@ -1633,6 +1830,7 @@ def main() -> int:
     results = run_cli_oracles()
     results.extend(run_security_regressions())
     results.extend(run_workflow_routing_regressions())
+    results.extend(run_readme_regressions())
     for case in data.get("selection", []):
         passed, detail = run_selection_case(case)
         results.append({"kind": "selection", "name": case["name"], "passed": passed, "detail": detail})
