@@ -1,129 +1,185 @@
-# Wide-Lens Review
+# Wide-Lens Engineering
 
-Evidence-gated Codex Skill for independent review, shared subagent deliberation, repository-wide impact mapping, and forced divergent thinking.
+Evidence-gated Codex Skill for efficient end-to-end software engineering: understand the repository, choose the smallest correct solution, coordinate shared subagents, write code through one owner, and verify delivery.
 
-用于复杂软件变更的 Codex Skill：先让多个代理独立审查，再进行共享质询，最后由主代理依据可复现实证裁决，而不是依赖多数票或主观置信度。
+面向完整软件工程任务的 Codex Skill：不再只做 review，而是覆盖功能实现、构建、调试、修复、重构、迁移、审查与交付。它先扩展视野，再用 Ponytail 式最小化策略收敛实现，最后以可执行证据验收。
 
-## Why
+## Operating modes
 
-Local code can look correct while breaking hidden consumers, state transitions, migrations, rollback paths, or operational assumptions. Wide-Lens Review adds a bounded review protocol around the model:
+| Intent | Purpose | Writes code |
+| --- | --- | --- |
+| `change` | Features, builds, refactors, migrations, requested changes | Yes |
+| `debug` | Reproduce, find the shared root cause, fix, add regression evidence | Yes |
+| `review` | Read-only audit and evidence-backed findings | No |
 
-- Map upstream inputs, downstream consumers, state, deployment, rollback, and verification surfaces.
-- Generate deterministic, risk-sensitive review lanes, including a forced orthogonal wildcard.
-- Keep Round 1 positions sealed to reduce peer anchoring.
-- Share one canonical peer board in Round 2 and require cross-agent falsification.
-- Resolve disagreements with executable checks and evidence, never by voting.
-- Reject incomplete or internally inconsistent review records with a deterministic gate.
+Low-risk isolated work uses a light single-owner path without subagents. Medium/high-risk or cross-cutting work can use two or three analysis agents with sealed independent positions followed by shared peer challenge.
+
+## Why this shape
+
+Efficient coding needs both breadth and restraint:
+
+- Repository mapping prevents a small patch in the wrong place.
+- Independent agents find hidden consumers, invariants, failure paths, and counterexamples.
+- A canonical shared board enables multi-agent discussion without majority voting.
+- Ponytail pressure removes speculative abstractions, dependencies, and boilerplate.
+- One editing owner avoids merge conflicts and inconsistent partial implementations.
+- Acceptance commands and delivery records prevent a plausible-looking diff from being treated as completion.
 
 ## Workflow
 
 ```mermaid
 flowchart LR
-    A["Freeze contract"] --> B["Map system impact"]
-    B --> C["Sealed independent review"]
-    C --> D["Canonical shared board"]
-    D --> E["Peer challenge and falsification"]
+    A["Freeze intent and acceptance"] --> B["Map causal surface"]
+    B --> C["Ponytail solution shaping"]
+    C --> D["Sealed independent agents"]
+    D --> E["Shared peer falsification"]
     E --> F["Evidence adjudication"]
-    F --> G["Single-owner implementation"]
+    F --> G["Single-owner code change"]
     G --> H["Narrow-to-broad verification"]
-    H --> I["Deterministic completion gate"]
+    H --> I["Delivery consistency gate"]
 ```
 
-Shared mode is bounded to two or three reviewers, two turns per reviewer, one retry total, ten minutes per round, and a 65,536-byte peer board. Nested reviewers and reviewer writes are forbidden.
+Shared mode is bounded to two or three agents, two turns per agent, one retry total, ten minutes per round, and a 65,536-byte peer board. Analysis agents remain read-only; the main thread owns integration.
+
+## Ponytail integration
+
+When the optional `$ponytail` Skill is available, Wide-Lens Engineering invokes it during solution shaping. It is not a hard dependency. Without Ponytail, the same fallback ladder is applied directly:
+
+1. Does this need to exist?
+2. Can existing repository code be reused?
+3. Can the standard library solve it?
+4. Can a native platform feature solve it?
+5. Can an already-installed dependency solve it?
+6. Only then add the minimum custom code.
+
+The ladder runs after repository comprehension. It never removes required security, validation, data integrity, error handling, accessibility, or regression checks.
 
 ## Install
 
-Clone the repository directly into a Codex-compatible personal Skill directory:
+The repository root is the Skill root and contains `SKILL.md` directly.
 
 ### Linux / macOS
 
 ```bash
-git clone https://github.com/Mai-xiyu/wide-lens-review.git ~/.agents/skills/wide-lens-review
+git clone https://github.com/Mai-xiyu/wide-lens-engineering.git ~/.agents/skills/wide-lens-engineering
 ```
 
 ### Windows PowerShell
 
 ```powershell
-git clone https://github.com/Mai-xiyu/wide-lens-review.git "$env:USERPROFILE\.agents\skills\wide-lens-review"
+git clone https://github.com/Mai-xiyu/wide-lens-engineering.git "$env:USERPROFILE\.agents\skills\wide-lens-engineering"
 ```
 
-The repository root is the Skill root and contains `SKILL.md` directly.
+### Upgrade from the old name
+
+Remove the old `wide-lens-review` Skill directory or junction, then install `wide-lens-engineering`. GitHub redirects the old repository URL after the rename, but the Codex invocation name changes to `$wide-lens-engineering`.
 
 ## Use
 
-Ask Codex to use the Skill explicitly:
+Implement a feature efficiently:
 
 ```text
-Use $wide-lens-review to review this cross-service migration with three shared subagents.
+Use $wide-lens-engineering to implement this feature. Use the light path if it is truly isolated; otherwise coordinate shared agents and keep one editing owner.
 ```
+
+Debug and fix a cross-module failure:
 
 ```text
-使用 $wide-lens-review 对这个高风险 PR 做全局审查，并让三个 subagent 先独立判断、再共享质询。
+Use $wide-lens-engineering in debug mode. Reproduce the failure, trace sibling callers, fix the shared root cause, and leave a regression check.
 ```
 
-The Skill should be used for cross-cutting changes, migrations, security or concurrency work, data-integrity changes, risky PRs, repository-wide audits, ambiguous multi-module failures, and explicit adversarial or multi-agent review requests. It intentionally stays inactive for ordinary isolated edits.
+Combine explicit Ponytail minimalism with shared agents:
+
+```text
+Use $wide-lens-engineering with $ponytail full to build this migration using three shared subagents. Resolve disagreements with executable evidence, not voting.
+```
+
+Run a read-only audit:
+
+```text
+Use $wide-lens-engineering in review mode. Do not edit files.
+```
 
 ## CLI
 
-Generate a shared three-reviewer packet:
+Generate a light coding packet:
 
 ```bash
 python scripts/diverge.py \
-  --task "Review a cross-service migration" \
-  --path src/api.py \
-  --path db/migration.sql \
-  --risk high \
-  --coordination shared \
-  --reviewers 3 \
+  --task "Implement tenant-aware export" \
+  --intent change \
+  --path src/export.py \
+  --risk low \
+  --profile light \
   --format json
 ```
 
-Validate a completed evidence record:
+Generate a shared debug packet:
 
 ```bash
-python scripts/check_review.py --packet packet.json --report report.json
+python scripts/diverge.py \
+  --task "Fix duplicate rows after retry" \
+  --intent debug \
+  --path src/store.py \
+  --risk high \
+  --coordination shared \
+  --agents 3 \
+  --format json
+```
+
+Validate a completed delivery record:
+
+```bash
+python scripts/check_delivery.py --packet packet.json --report report.json
 ```
 
 Run the regression suite:
 
 ```bash
-python tests/run_eval.py --json
+python -B tests/run_eval.py --json
 ```
 
-The scripts use only the Python standard library.
+The runtime scripts use only the Python standard library.
+
+## Delivery contract
+
+For `change` and `debug`, the final report records:
+
+- Implementation status and one `main-thread` editing owner.
+- Allowed and actually changed repository-relative paths.
+- Authorized baseline, final-state, and diff references.
+- Ponytail source, intensity, selected ladder rung, rejected complexity, and preserved safety.
+- Acceptance criteria mapped to commands that also appear as passed top-level checks.
+- Root-cause evidence and reproduction command for `debug`.
+
+For `review`, `implementation` must be `null`.
+
+The deterministic gate checks internal consistency. It deliberately does not execute commands from an untrusted report, inspect the repository, authenticate evidence, or prove agent isolation. Raw command output and tracked/untracked/ignored state manifests must be produced through the authorized main-thread tool path.
 
 ## Repository layout
 
 ```text
 .
-├── SKILL.md                 # Trigger metadata and agent workflow
+├── SKILL.md                 # Intent routing and engineering workflow
 ├── agents/
-│   └── openai.yaml          # Codex UI metadata
+│   └── openai.yaml          # Codex UI metadata and default prompt
 ├── references/
-│   ├── lenses.json          # Deterministic review-lane catalog
-│   └── protocol.md          # Evidence and shared-discussion schema
+│   ├── lenses.json          # Intent-aware deterministic lane catalog
+│   └── protocol.md          # Evidence, implementation, and discussion schema
 ├── scripts/
-│   ├── diverge.py           # Risk-sensitive review packet generator
-│   └── check_review.py      # Deterministic consistency gate
+│   ├── diverge.py           # Work-packet and shared-agent prompt generator
+│   └── check_delivery.py    # Deterministic delivery consistency gate
 └── tests/
-    ├── eval_cases.json      # Mutation and policy cases
-    └── run_eval.py          # Test runner and subprocess oracles
+    ├── eval_cases.json      # Selection, mutation, policy, and failure cases
+    └── run_eval.py          # Test runner and real CLI subprocess oracles
 ```
 
-## Validation model
+## Validation scope
 
-The current suite contains 172 cases and requires a 100% fixed-case pass rate by default. It covers planner selection, shared-agent assignments, canonical prompts, peer-board digests, evidence schemas, timeout and retry accounting, malformed inputs, and two real subprocess oracles.
+The fixed suite requires a 100% pass rate by default and refuses thresholds below 98%. It covers intent routing, light/full behavior, Ponytail activation, shared-agent assignments, canonical prompts, peer-board digests, implementation outcomes, root-cause records, edit-scope paths, acceptance mappings, malformed inputs, timeout/retry accounting, and real planner/gate CLI subprocesses.
 
-This rate measures the checked fixtures only. It is not a claim of universal defect recall, model accuracy, or proof that self-reported evidence is genuine. The gate deliberately does not execute commands embedded in an untrusted report.
-
-## Security and limits
-
-- Peer content is treated as untrusted inert data; embedded instructions must not be followed.
-- A SHA-256 board digest detects inconsistent recorded boards, but cannot prove transport delivery.
-- Prompt-level read-only instructions are not a sandbox. Use an enforced read-only environment when available.
-- The gate checks record consistency; it cannot cryptographically prove Round 1 isolation, reviewer identity, or real-world correctness.
-- The Skill improves orchestration and verification discipline. It does not change model weights or guarantee that every defect will be found.
+That rate measures only the checked fixtures. It is not universal defect recall, model accuracy, or proof that self-reported evidence is genuine.
 
 ## Keywords
 
-Codex Skill, OpenAI Codex, multi-agent review, subagent orchestration, shared agents, adversarial review, code review, software architecture, repository audit, evidence-gated validation, devil's advocate, forced divergent thinking, agentic workflow.
+Codex Skill, OpenAI Codex, software engineering, coding agent, code generation, feature implementation, debugging, bug fixing, refactoring, migrations, multi-agent systems, shared subagents, agent orchestration, adversarial analysis, code review, repository audit, evidence-gated delivery, Ponytail, YAGNI, minimalism, forced divergent thinking, agentic coding workflow.

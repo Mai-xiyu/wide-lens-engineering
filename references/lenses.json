@@ -1,16 +1,25 @@
 {
-  "version": 1,
-  "base": [
-    "system-map",
-    "contract-boundaries",
-    "adversarial-counterexample",
-    "verification-oracle",
-    "orthogonal-wildcard"
-  ],
-  "light": [
-    "system-map",
-    "adversarial-counterexample"
-  ],
+  "version": 2,
+  "base": {
+    "change": [
+      "system-map", "contract-boundaries", "maintainability-simplicity",
+      "verification-oracle", "adversarial-counterexample", "orthogonal-wildcard"
+    ],
+    "debug": [
+      "system-map", "contract-boundaries", "root-cause",
+      "maintainability-simplicity", "verification-oracle",
+      "adversarial-counterexample", "orthogonal-wildcard"
+    ],
+    "review": [
+      "system-map", "contract-boundaries", "adversarial-counterexample",
+      "verification-oracle", "orthogonal-wildcard"
+    ]
+  },
+  "light": {
+    "change": ["system-map", "maintainability-simplicity", "verification-oracle"],
+    "debug": ["system-map", "root-cause", "verification-oracle"],
+    "review": ["system-map", "adversarial-counterexample"]
+  },
   "lenses": [
     {
       "id": "system-map",
@@ -38,6 +47,15 @@
       "disconfirm": "Attempt the counterexample or show the exact guard that prevents it.",
       "evidence": "Provide a reproduction, test target, trace, or precise guard reference.",
       "triggers": []
+    },
+    {
+      "id": "root-cause",
+      "title": "Root cause and reproduction",
+      "mission": "Reproduce the failure, trace every relevant caller, and locate the earliest shared cause rather than patching one symptom.",
+      "question": "Which causal mechanism explains the observed failure and its sibling paths?",
+      "disconfirm": "Try to reproduce the symptom through another caller and falsify the proposed root cause.",
+      "evidence": "Reference the reproduction command, failing observation, callers, and the shared correction point.",
+      "triggers": ["bug", "fix", "debug", "regression", "crash", "failure", "root cause", "reproduce", "failing test", "\u9519\u8bef", "\u6545\u969c", "\u56de\u5f52", "\u5d29\u6e83", "\u6839\u56e0", "\u590d\u73b0"]
     },
     {
       "id": "verification-oracle",
@@ -164,6 +182,7 @@
       "disconfirm": "Search for a second real use case before accepting a new abstraction or dependency.",
       "evidence": "Reference duplication, coupling, ownership boundaries, alternatives, and maintenance burden.",
       "triggers": [
+        "ponytail", "minimal", "minimalism", "simplest", "yagni", "over-engineering", "overengineering", "bloat", "boilerplate",
         "refactor", "architecture", "abstraction", "framework", "generic", "plugin", "factory", "maintain", "technical debt", "cleanup", "重构", "架构", "抽象", "框架", "插件", "工厂", "维护", "技术债", "清理"
       ]
     },

@@ -5,6 +5,7 @@
 - Evidence levels
 - Lane result
 - Shared deliberation record
+- Implementation outcome
 - Final report
 - Gate semantics
 
@@ -56,7 +57,7 @@ Record at least one initial position per participant. The union of `lens_ids` mu
 ```json
 {
   "id": "P-001",
-  "author": "reviewer-1",
+  "author": "agent-1",
   "lens_ids": ["system-map", "data-lifecycle"],
   "claim": "The migration retries can duplicate the durable transition.",
   "evidence": [
@@ -74,7 +75,7 @@ In Round 2, require every participant to stress-test at least one position from 
 ```json
 {
   "id": "C-001",
-  "author": "reviewer-2",
+  "author": "agent-2",
   "target_position_id": "P-001",
   "stance": "challenge",
   "falsification_attempt": "Inspected whether one transaction contains both writes.",
@@ -117,15 +118,15 @@ Place these objects under:
     "sealed_before_exchange": true,
     "peer_board_sha256": "<64 lowercase hex characters>",
     "deliveries": [
-      {"participant_id": "reviewer-1", "peer_board_sha256": "<same digest>"},
-      {"participant_id": "reviewer-2", "peer_board_sha256": "<same digest>"}
+      {"participant_id": "agent-1", "peer_board_sha256": "<same digest>"},
+      {"participant_id": "agent-2", "peer_board_sha256": "<same digest>"}
     ],
     "operation": {
       "round_seconds": {
         "independent-position": 120,
         "peer-challenge": 90
       },
-      "turns_completed": {"reviewer-1": 2, "reviewer-2": 2},
+      "turns_completed": {"agent-1": 2, "agent-2": 2},
       "retries_total": 0,
       "timed_out_participants": [],
       "cancelled_after_timeout": [],
@@ -140,15 +141,85 @@ Place these objects under:
 }
 ```
 
-## Final report
+## Implementation outcome
+
+Use `implementation: null` for `review` intent. Use the following object for `change` and `debug`:
+
+```json
+{
+  "status": "changed",
+  "owner": "main-thread",
+  "allowed_paths": ["src", "tests"],
+  "changed_paths": ["src/export.py", "tests/test_export.py"],
+  "no_change_reason": null,
+  "baseline_ref": "authorized pre-edit state manifest: artifacts/baseline.json",
+  "final_state_ref": "authorized post-verification state manifest: artifacts/final.json",
+  "diff_ref": "git diff -- src/export.py tests/test_export.py",
+  "root_cause": null,
+  "minimalism": {
+    "source": "ponytail",
+    "level": "full",
+    "selected_rung": "reuse",
+    "rejected_complexity": [
+      "Reused the existing transaction helper instead of adding a retry framework."
+    ],
+    "safety_preserved": [
+      "Authorization and rollback behavior remain enforced."
+    ]
+  },
+  "acceptance": [
+    {
+      "criterion": "A retried export creates exactly one durable row.",
+      "command": "pytest tests/test_export.py::test_retry_is_idempotent"
+    }
+  ]
+}
+```
+
+Use status `changed` when files changed. It requires at least one changed path and `no_change_reason: null`. Use status `no-change` only when the frozen contract was already satisfied; it requires an empty `changed_paths` list and a concrete reason. Keep allowed and changed paths relative to the repository, without `.` or `..`; every changed path must be equal to or below one allowed path.
+
+Record baseline and final-state references produced through the authorized tool path. For shared analysis without an enforced read-only sandbox, the referenced manifests must cover tracked, untracked, and ignored files under the analysis scope. These fields remain self-reported references; the JSON gate does not read or authenticate the referenced state.
+
+Use `source` values `ponytail` or `built-in`, `level` values `lite`, `full`, or `ultra`, and one selected rung:
+
+- `reuse`
+- `stdlib`
+- `native`
+- `existing-dependency`
+- `minimal-custom`
+
+Record at least one preserved safety or correctness property. An empty rejected-complexity list is valid when no larger alternative was seriously considered.
+
+For `debug`, replace `root_cause: null` with:
+
+```json
+{
+  "claim": "The shared parser accepts an invalid transition used by every failing caller.",
+  "evidence": [
+    {
+      "level": "E3",
+      "ref": "pytest tests/test_parser.py::test_invalid_transition: failed before fix",
+      "claim": "The reproduction reaches the shared parser from both affected callers."
+    }
+  ],
+  "reproduction_command": "pytest tests/test_parser.py::test_invalid_transition"
+}
+```
+
+Every acceptance and reproduction command must appear exactly as a passed top-level check. For `change`, keep `root_cause` null.
+
 
 Use this top-level shape:
+## Final report
+
 
 ```json
 {
   "task": "Add tenant-aware export",
+  "intent": "change",
   "coordination": "shared",
   "risk": "high",
+  "implementation": {},
   "coverage": [],
   "findings": [],
   "disagreements": [],
@@ -223,6 +294,11 @@ The deterministic gate requires:
 - No deliberation record on an independent packet.
 - Exactly one coverage record for every emitted lens.
 - No blocked lane and no evidence-free lane result.
+- Packet version 3, a valid `change`, `debug`, or `review` intent, and its exact execution policy.
+- Exact agreement between packet and report intent.
+- `implementation: null` for review intent.
+- A complete implementation outcome for change/debug, including one main-thread owner, safe relative paths, state/diff references, minimalism decision, and acceptance mapping.
+- Root-cause evidence and a passed reproduction command for debug intent.
 - Evidence with valid levels and non-empty references/claims.
 - Evidence-backed findings with valid severity and disposition.
 - For shared coordination, canonical assignment and relay prompts reconstructed from structured packet fields.
@@ -235,4 +311,4 @@ The deterministic gate requires:
 - A passed top-level check matching each fixed finding's verification command.
 - No failed check.
 
-These are minimum record-consistency guarantees. The script deliberately does not execute commands from a report or authenticate evidence, because a report can be untrusted and automatic command execution would add a code-execution boundary. It also cannot cryptographically prove the original user-selected coordination mode, actual message delivery, or genuine Round 1 isolation; preserve the original packet through the authorized workflow. Run checks through the normal authorized tool path before invoking the gate. Domain-specific acceptance checks may impose stronger requirements.
+These are minimum record-consistency guarantees. The script deliberately does not execute commands from a report, inspect the repository, or authenticate evidence and state references, because an untrusted report must not create a code-execution or filesystem-trust boundary. It also cannot cryptographically prove the original user-selected intent, actual message delivery, genuine Round 1 isolation, or that a claimed diff occurred. Preserve the original packet and authorized raw outputs through the workflow. Run checks and compute state references through the normal authorized tool path before invoking the gate. Domain-specific acceptance checks may impose stronger requirements.

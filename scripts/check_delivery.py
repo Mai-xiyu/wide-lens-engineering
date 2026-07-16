@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a wide-lens review report against its emitted packet."""
+"""Validate a Wide-Lens Engineering delivery report against its packet."""
 
 from __future__ import annotations
 
@@ -22,6 +22,11 @@ VALID_RISKS = {"low", "medium", "high"}
 VALID_PROFILES = {"light", "full"}
 VALID_COORDINATION = {"independent", "shared"}
 VALID_STANCES = {"support", "challenge", "uncertain"}
+VALID_INTENTS = {"change", "debug", "review"}
+CODING_INTENTS = {"change", "debug"}
+VALID_IMPLEMENTATION_STATUS = {"changed", "no-change"}
+VALID_MINIMALISM_SOURCES = {"ponytail", "built-in"}
+VALID_MINIMALISM_RUNGS = {"reuse", "stdlib", "native", "existing-dependency", "minimal-custom"}
 PLACEHOLDERS = {".", "-", "n/a", "na", "none", "unknown", "tbd"}
 
 EXPECTED_DISCUSSION_BUDGET = {
@@ -410,6 +415,144 @@ def _validate_deliberation(
     return challenge_checks
 
 
+def _expected_execution_policy(intent: str) -> dict[str, Any]:
+    return {
+        "implementation_required": intent in CODING_INTENTS,
+        "editing_owner": "main-thread",
+        "analysis_agents_read_only": True,
+        "ponytail_level": "full",
+        "minimalism_ladder": [
+            "reuse",
+            "stdlib",
+            "native",
+            "existing-dependency",
+            "minimal-custom",
+        ],
+    }
+
+
+def _repo_path(value: Any) -> str | None:
+    if not _nonempty_string(value):
+        return None
+    normalized = value.strip().replace("\\", "/")
+    parts = normalized.split("/")
+    if (
+        normalized.startswith("/")
+        or ":" in parts[0]
+        or any(part in {"", ".", ".."} for part in parts)
+    ):
+        return None
+    return "/".join(parts)
+
+
+def _validate_implementation(value: Any, intent: Any, errors: list[str]) -> list[str]:
+    required_commands: list[str] = []
+    if intent == "review":
+        if value is not None:
+            errors.append("report.implementation: review intent requires null")
+        return required_commands
+    if intent not in CODING_INTENTS:
+        return required_commands
+    location = "report.implementation"
+    if not isinstance(value, dict):
+        errors.append(f"{location}: {intent} intent requires an object")
+        return required_commands
+    expected_keys = {
+        "status", "owner", "allowed_paths", "changed_paths", "no_change_reason",
+        "baseline_ref", "final_state_ref", "diff_ref", "root_cause",
+        "minimalism", "acceptance",
+    }
+    if set(value) != expected_keys:
+        errors.append(f"{location}: keys must equal {sorted(expected_keys)}")
+    status = value.get("status")
+    if not _one_of(status, VALID_IMPLEMENTATION_STATUS):
+        errors.append(f"{location}.status: expected one of {sorted(VALID_IMPLEMENTATION_STATUS)}")
+    if value.get("owner") != "main-thread":
+        errors.append(f"{location}.owner: must be main-thread")
+
+    allowed_raw = value.get("allowed_paths")
+    changed_raw = value.get("changed_paths")
+    allowed = [_repo_path(item) for item in allowed_raw] if isinstance(allowed_raw, list) else []
+    changed = [_repo_path(item) for item in changed_raw] if isinstance(changed_raw, list) else []
+    if not allowed_raw or not isinstance(allowed_raw, list) or any(item is None for item in allowed):
+        errors.append(f"{location}.allowed_paths: must be a non-empty list of relative repository paths")
+    if not isinstance(changed_raw, list) or any(item is None for item in changed):
+        errors.append(f"{location}.changed_paths: must be a list of relative repository paths")
+    if len(allowed) != len(set(allowed)):
+        errors.append(f"{location}.allowed_paths: duplicate paths")
+    if len(changed) != len(set(changed)):
+        errors.append(f"{location}.changed_paths: duplicate paths")
+    if status == "changed" and not changed_raw:
+        errors.append(f"{location}.changed_paths: changed status requires at least one path")
+    if status == "no-change" and changed_raw:
+        errors.append(f"{location}.changed_paths: no-change status requires an empty list")
+    reason = value.get("no_change_reason")
+    if status == "no-change" and not _concrete_string(reason):
+        errors.append(f"{location}.no_change_reason: no-change status needs a concrete reason")
+    if status == "changed" and reason is not None:
+        errors.append(f"{location}.no_change_reason: changed status requires null")
+    allowed_values = [item for item in allowed if item is not None]
+    for path in (item for item in changed if item is not None):
+        if not any(path == root or path.startswith(root.rstrip("/") + "/") for root in allowed_values):
+            errors.append(f"{location}.changed_paths: path outside allowed scope {path!r}")
+    for field in ("baseline_ref", "final_state_ref", "diff_ref"):
+        if not _concrete_string(value.get(field)):
+            errors.append(f"{location}.{field}: must be concrete")
+
+    root_cause = value.get("root_cause")
+    if intent == "change" and root_cause is not None:
+        errors.append(f"{location}.root_cause: change intent requires null")
+    if intent == "debug":
+        if not isinstance(root_cause, dict) or set(root_cause) != {"claim", "evidence", "reproduction_command"}:
+            errors.append(f"{location}.root_cause: debug intent needs claim, evidence, and reproduction_command")
+        else:
+            if not _concrete_string(root_cause.get("claim")):
+                errors.append(f"{location}.root_cause.claim: must be concrete")
+            _validate_evidence(root_cause.get("evidence"), f"{location}.root_cause", errors)
+            command = root_cause.get("reproduction_command")
+            if not _concrete_string(command):
+                errors.append(f"{location}.root_cause.reproduction_command: must be concrete")
+            else:
+                required_commands.append(command)
+
+    minimalism = value.get("minimalism")
+    if not isinstance(minimalism, dict) or set(minimalism) != {
+        "source", "level", "selected_rung", "rejected_complexity", "safety_preserved"
+    }:
+        errors.append(f"{location}.minimalism: must contain the complete minimalism decision")
+    else:
+        if not _one_of(minimalism.get("source"), VALID_MINIMALISM_SOURCES):
+            errors.append(f"{location}.minimalism.source: expected one of {sorted(VALID_MINIMALISM_SOURCES)}")
+        if minimalism.get("level") not in {"lite", "full", "ultra"}:
+            errors.append(f"{location}.minimalism.level: expected lite, full, or ultra")
+        if not _one_of(minimalism.get("selected_rung"), VALID_MINIMALISM_RUNGS):
+            errors.append(f"{location}.minimalism.selected_rung: expected one of {sorted(VALID_MINIMALISM_RUNGS)}")
+        rejected = minimalism.get("rejected_complexity")
+        if not isinstance(rejected, list) or not all(_nonempty_string(item) for item in rejected):
+            errors.append(f"{location}.minimalism.rejected_complexity: must be a string list")
+        if not _string_list(minimalism.get("safety_preserved")):
+            errors.append(f"{location}.minimalism.safety_preserved: must be a non-empty string list")
+
+    acceptance = value.get("acceptance")
+    if not isinstance(acceptance, list) or not acceptance:
+        errors.append(f"{location}.acceptance: must be a non-empty list")
+    else:
+        for index, item in enumerate(acceptance):
+            item_location = f"{location}.acceptance[{index}]"
+            if not isinstance(item, dict) or set(item) != {"criterion", "command"}:
+                errors.append(f"{item_location}: must contain criterion and command")
+                continue
+            if not _concrete_string(item.get("criterion")):
+                errors.append(f"{item_location}.criterion: must be concrete")
+            if not _concrete_string(item.get("command")):
+                errors.append(f"{item_location}.command: must be concrete")
+            else:
+                required_commands.append(item["command"])
+    if len(required_commands) != len(set(required_commands)):
+        errors.append(f"{location}: reproduction and acceptance commands must be distinct")
+    return required_commands
+
+
 def evaluate(packet: Any, report: Any) -> dict[str, Any]:
     errors: list[str] = []
     if not isinstance(packet, dict):
@@ -427,8 +570,8 @@ def evaluate(packet: Any, report: Any) -> dict[str, Any]:
         return {"passed": False, "errors": ["packet.lanes: duplicate lane ids"]}
     expected_lanes = set(lane_ids)
 
-    if packet.get("version") != 2:
-        errors.append("packet.version: must be 2")
+    if packet.get("version") != 3:
+        errors.append("packet.version: must be 3")
     packet_risk = packet.get("risk")
     if not _one_of(packet_risk, VALID_RISKS):
         errors.append(f"packet.risk: expected one of {sorted(VALID_RISKS)}")
@@ -436,6 +579,12 @@ def evaluate(packet: Any, report: Any) -> dict[str, Any]:
         errors.append(f"packet.profile: expected one of {sorted(VALID_PROFILES)}")
     if packet.get("profile") == "light" and packet_risk != "low":
         errors.append("packet.profile: light is allowed only for low risk")
+    packet_intent = packet.get("intent")
+    if not _one_of(packet_intent, VALID_INTENTS):
+        errors.append(f"packet.intent: expected one of {sorted(VALID_INTENTS)}")
+    elif packet.get("execution_policy") != _expected_execution_policy(packet_intent):
+        errors.append("packet.execution_policy: must match the intent execution policy")
+
 
     assignments = _packet_participants(packet, expected_lanes, errors)
     deliberation_checks: list[tuple[str, str]] = []
@@ -453,6 +602,11 @@ def evaluate(packet: Any, report: Any) -> dict[str, Any]:
     if report.get("risk") != packet.get("risk"):
         errors.append("report.risk: must exactly match packet.risk")
 
+    if report.get("intent") != packet_intent:
+        errors.append("report.intent: must exactly match packet.intent")
+    implementation_commands = _validate_implementation(
+        report.get("implementation"), packet_intent, errors
+    )
     coverage = report.get("coverage")
     if not isinstance(coverage, list):
         errors.append("report.coverage: must be a list")
@@ -634,6 +788,10 @@ def evaluate(packet: Any, report: Any) -> dict[str, Any]:
             errors.append(f"{location}.verification: must reference at least one passed check command")
 
     residual_risks = report.get("residual_risks")
+    for command in implementation_commands:
+        if command not in passed_commands:
+            errors.append("report.implementation: every reproduction and acceptance command must be a passed check")
+
     if not isinstance(residual_risks, list) or not all(
         _nonempty_string(item) for item in residual_risks
     ):
@@ -648,6 +806,8 @@ def evaluate(packet: Any, report: Any) -> dict[str, Any]:
             "findings": len(findings),
             "disagreements": len(disagreements),
             "passing_checks": len(passed_commands),
+            "intent": packet_intent,
+            "implementation_status": report.get("implementation", {}).get("status") if isinstance(report.get("implementation"), dict) else None,
         },
     }
 

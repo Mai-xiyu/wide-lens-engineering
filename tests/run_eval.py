@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the frozen 100-plus-case acceptance evaluation for wide-lens-review."""
+"""Run the frozen acceptance evaluation for Wide-Lens Engineering."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import json
 import sys
 import subprocess
 from pathlib import Path
+import tempfile
 from typing import Any
 
 
@@ -17,14 +18,15 @@ TEST_DIR = Path(__file__).resolve().parent
 SKILL_DIR = TEST_DIR.parent
 sys.path.insert(0, str(SKILL_DIR / "scripts"))
 
-from check_review import evaluate  # noqa: E402
+from check_delivery import evaluate  # noqa: E402
 from diverge import build_packet, render_markdown  # noqa: E402
 
 
 DEFAULT_CASES = TEST_DIR / "eval_cases.json"
 
-TARGETED_COMMAND = "python -c \"print('wide-lens-targeted')\""
-BROADER_COMMAND = "python -c \"print('wide-lens-broader')\""
+TARGETED_COMMAND = "python -c \"print('wide-lens-engineering-targeted')\""
+BROADER_COMMAND = "python -c \"print('wide-lens-engineering-broader')\""
+OLD_SKILL_NAME = "wide-" "lens-review"
 
 def evidence(ref: str = "src/example.py:10") -> list[dict[str, str]]:
     return [{"level": "E2", "ref": ref, "claim": "Inspected behavior supports this result."}]
@@ -104,11 +106,50 @@ def valid_deliberation(packet: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def valid_implementation(packet: dict[str, Any]) -> dict[str, Any] | None:
+    intent = packet["intent"]
+    if intent == "review":
+        return None
+    root_cause = None
+    if intent == "debug":
+        root_cause = {
+            "claim": "The shared parser accepts an invalid transition used by every failing caller.",
+            "evidence": evidence("src/parser.py:20"),
+            "reproduction_command": BROADER_COMMAND,
+        }
+    return {
+        "status": "changed",
+        "owner": "main-thread",
+        "allowed_paths": ["src", "tests"],
+        "changed_paths": ["src/example.py"],
+        "no_change_reason": None,
+        "baseline_ref": "authorized manifest before editing: baseline.json",
+        "final_state_ref": "authorized manifest after verification: final.json",
+        "diff_ref": "git diff -- src/example.py",
+        "root_cause": root_cause,
+        "minimalism": {
+            "source": "built-in",
+            "level": "full",
+            "selected_rung": "reuse",
+            "rejected_complexity": ["Skipped a new dependency and reused the shared helper."],
+            "safety_preserved": ["Input validation and error handling remain enforced."],
+        },
+        "acceptance": [
+            {
+                "criterion": "The requested behavior passes its targeted regression.",
+                "command": TARGETED_COMMAND,
+            }
+        ],
+    }
+
+
 def base_report(packet: dict[str, Any]) -> dict[str, Any]:
     report = {
         "task": packet["task"],
         "coordination": packet["coordination"],
         "risk": packet["risk"],
+        "intent": packet["intent"],
+        "implementation": valid_implementation(packet),
         "coverage": [
             {
                 "lens_id": lane["id"],
@@ -198,6 +239,65 @@ def mutate(packet: dict[str, Any], report: dict[str, Any], mutation: str) -> Non
     if mutation == "valid-residual-risk":
         report["residual_risks"] = ["The external service sandbox does not model regional failure."]
         return
+    if mutation == "valid-no-change":
+        report["implementation"].update(
+            {"status": "no-change", "changed_paths": [], "no_change_reason": "The requested behavior already passes the frozen acceptance check."}
+        )
+        return
+    if mutation == "valid-ponytail":
+        report["implementation"]["minimalism"]["source"] = "ponytail"
+        return
+    if mutation == "report-intent-mismatch":
+        report["intent"] = "review" if packet["intent"] != "review" else "change"
+        return
+    if mutation == "packet-invalid-intent":
+        packet["intent"] = "build"
+        return
+    if mutation == "packet-invalid-execution-policy":
+        packet["execution_policy"]["editing_owner"] = "agent-1"
+        return
+    if mutation == "implementation-missing":
+        report["implementation"] = None
+        return
+    if mutation == "review-implementation-present":
+        change_packet = dict(packet)
+        change_packet["intent"] = "change"
+        report["implementation"] = valid_implementation(change_packet)
+        return
+    if mutation == "implementation-empty-owner":
+        report["implementation"]["owner"] = ""
+        return
+    if mutation == "implementation-no-changes":
+        report["implementation"]["changed_paths"] = []
+        return
+    if mutation == "implementation-outside-scope":
+        report["implementation"]["changed_paths"] = ["outside/file.py"]
+        return
+    if mutation == "implementation-unsafe-path":
+        report["implementation"]["changed_paths"] = ["../outside.py"]
+        return
+    if mutation == "implementation-no-baseline":
+        report["implementation"]["baseline_ref"] = ""
+        return
+    if mutation == "implementation-no-minimalism":
+        report["implementation"]["minimalism"] = None
+        return
+    if mutation == "implementation-invalid-rung":
+        report["implementation"]["minimalism"]["selected_rung"] = "new-framework"
+        return
+    if mutation == "implementation-no-safety":
+        report["implementation"]["minimalism"]["safety_preserved"] = []
+        return
+    if mutation == "implementation-acceptance-unexecuted":
+        report["implementation"]["acceptance"][0]["command"] = "command-never-run"
+        return
+    if mutation == "debug-no-root-cause":
+        report["implementation"]["root_cause"] = None
+        return
+    if mutation == "debug-reproduction-unexecuted":
+        report["implementation"]["root_cause"]["reproduction_command"] = "debug-command-never-run"
+        return
+
 
     deliberation_mutations = {
         "deliberation-in-independent",
@@ -286,15 +386,15 @@ def mutate(packet: dict[str, Any], report: dict[str, Any], mutation: str) -> Non
     elif mutation == "shared-too-many-retries":
         report["deliberation"]["operation"]["retries_total"] = 2
     elif mutation == "shared-turn-count":
-        report["deliberation"]["operation"]["turns_completed"]["reviewer-1"] = 1
+        report["deliberation"]["operation"]["turns_completed"]["agent-1"] = 1
     elif mutation == "shared-timeout-not-cancelled":
-        report["deliberation"]["operation"]["timed_out_participants"] = ["reviewer-1"]
+        report["deliberation"]["operation"]["timed_out_participants"] = ["agent-1"]
     elif mutation == "shared-nested-reviewer":
         report["deliberation"]["operation"]["nested_reviewers_spawned"] = True
     elif mutation == "shared-write-detected":
         report["deliberation"]["operation"]["writes_detected"] = True
     elif mutation == "shared-unknown-author":
-        report["deliberation"]["initial_positions"][0]["author"] = "reviewer-999"
+        report["deliberation"]["initial_positions"][0]["author"] = "agent-999"
     elif mutation == "shared-unowned-lane":
         peer_lane = packet["discussion"]["participants"][1]["lane_ids"][0]
         report["deliberation"]["initial_positions"][0]["lens_ids"] = [peer_lane]
@@ -459,6 +559,7 @@ def run_selection_case(case: dict[str, Any]) -> tuple[bool, str]:
         profile=case.get("profile", "full"),
         coordination=coordination,
         reviewers=reviewers,
+        intent=case.get("intent", "change"),
     )
     selected = {lane["id"] for lane in packet["lanes"]}
     expected = set(case.get("expected", []))
@@ -466,7 +567,7 @@ def run_selection_case(case: dict[str, Any]) -> tuple[bool, str]:
     missing = sorted(expected - selected)
     unexpected = sorted(absent & selected)
     expected_target = json.dumps(
-        {"task": packet["task"], "risk": packet["risk"], "paths": packet["paths"]},
+        {"task": packet["task"], "intent": packet["intent"], "risk": packet["risk"], "paths": packet["paths"]},
         ensure_ascii=False,
         separators=(",", ":"),
     )
@@ -484,6 +585,7 @@ def run_selection_case(case: dict[str, Any]) -> tuple[bool, str]:
         profile=case.get("profile", "full"),
         coordination=coordination,
         reviewers=reviewers,
+        intent=case.get("intent", "change"),
     )
     nondeterministic = packet != reversed_packet
     discussion_invalid = False
@@ -538,11 +640,12 @@ def run_planner_error_case(case: dict[str, Any]) -> tuple[bool, str]:
             profile=case.get("profile", "full"),
             coordination=case.get("coordination", "independent"),
             reviewers=case.get("reviewers"),
+            intent=case.get("intent", "change"),
         )
     except ValueError as exc:
         message = str(exc)
         return case["contains"] in message, f"error={message!r}"
-    return False, "planner unexpectedly accepted invalid coordination input"
+    return False, "planner unexpectedly accepted invalid input"
 
 
 def run_gate_case(case: dict[str, Any]) -> tuple[bool, str]:
@@ -552,6 +655,7 @@ def run_gate_case(case: dict[str, Any]) -> tuple[bool, str]:
         case["risk"],
         coordination=case.get("coordination", "independent"),
         reviewers=case.get("reviewers"),
+        intent=case.get("intent", "change"),
     )
     report = base_report(packet)
     mutate(packet, report, case["mutation"])
@@ -572,27 +676,113 @@ def threshold_arg(value: str) -> float:
 
 
 def run_fixture_oracles() -> list[dict[str, Any]]:
-    specs = (
-        ("targeted command", "wide-lens-targeted"),
-        ("broader command", "wide-lens-broader"),
-    )
     results: list[dict[str, Any]] = []
-    for name, marker in specs:
-        completed = subprocess.run(
-            [sys.executable, "-c", f"print({marker!r})"],
+    planner = subprocess.run(
+        [
+            sys.executable,
+            "-B",
+            str(SKILL_DIR / "scripts" / "diverge.py"),
+            "--task",
+            "Debug a shared parser regression",
+            "--path",
+            "src/parser.py",
+            "--intent",
+            "debug",
+            "--coordination",
+            "shared",
+            "--agents",
+            "2",
+            "--format",
+            "json",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    planner_payload: dict[str, Any] = {}
+    try:
+        planner_payload = json.loads(planner.stdout)
+    except json.JSONDecodeError:
+        pass
+    planner_passed = (
+        planner.returncode == 0
+        and planner_payload.get("version") == 3
+        and planner_payload.get("intent") == "debug"
+        and "root-cause" in {lane.get("id") for lane in planner_payload.get("lanes", [])}
+        and len(planner_payload.get("discussion", {}).get("participants", [])) == 2
+    )
+    results.append(
+        {
+            "kind": "fixture_oracle",
+            "name": "planner CLI shared debug",
+            "passed": planner_passed,
+            "detail": f"exit_code={planner.returncode}, intent={planner_payload.get('intent')!r}",
+        }
+    )
+
+    packet = build_packet("Implement the frozen behavior", ["src/example.py"], "medium", intent="change")
+    report = base_report(packet)
+    with tempfile.TemporaryDirectory(prefix="wide-lens-engineering-") as temp_dir:
+        packet_path = Path(temp_dir) / "packet.json"
+        report_path = Path(temp_dir) / "report.json"
+        packet_path.write_text(json.dumps(packet, ensure_ascii=False), encoding="utf-8")
+        report_path.write_text(json.dumps(report, ensure_ascii=False), encoding="utf-8")
+        gate = subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                str(SKILL_DIR / "scripts" / "check_delivery.py"),
+                "--packet",
+                str(packet_path),
+                "--report",
+                str(report_path),
+            ],
             check=False,
             capture_output=True,
             text=True,
         )
-        passed = completed.returncode == 0 and completed.stdout.strip() == marker
+        try:
+            gate_payload = json.loads(gate.stdout)
+        except json.JSONDecodeError:
+            gate_payload = {}
         results.append(
             {
                 "kind": "fixture_oracle",
-                "name": name,
-                "passed": passed,
-                "detail": f"exit_code={completed.returncode}, stdout={completed.stdout.strip()!r}",
+                "name": "delivery gate CLI change",
+                "passed": gate.returncode == 0 and gate_payload.get("passed") is True,
+                "detail": f"exit_code={gate.returncode}, errors={gate_payload.get('errors')!r}",
             }
         )
+    identity_paths = [
+        SKILL_DIR / "SKILL.md",
+        SKILL_DIR / "agents" / "openai.yaml",
+        SKILL_DIR / "references" / "lenses.json",
+        SKILL_DIR / "references" / "protocol.md",
+        SKILL_DIR / "scripts" / "diverge.py",
+        SKILL_DIR / "scripts" / "check_delivery.py",
+    ]
+    runtime_text = "\n".join(path.read_text(encoding="utf-8") for path in identity_paths)
+    readme_text = (SKILL_DIR / "README.md").read_text(encoding="utf-8")
+    identity_passed = (
+        OLD_SKILL_NAME not in runtime_text.casefold()
+        and "name: wide-lens-engineering" in runtime_text
+        and "$wide-lens-engineering" in runtime_text
+        and "https://github.com/Mai-xiyu/wide-lens-engineering.git" in readme_text
+        and readme_text.casefold().count(OLD_SKILL_NAME) == 1
+        and (SKILL_DIR / "scripts" / "check_delivery.py").is_file()
+        and not (SKILL_DIR / "scripts" / "check_review.py").exists()
+    )
+    results.append(
+        {
+            "kind": "fixture_oracle",
+            "name": "published identity consistency",
+            "passed": identity_passed,
+            "detail": (
+                f"runtime_old_slug={OLD_SKILL_NAME in runtime_text.casefold()}, "
+                f"readme_old_slug_count={readme_text.casefold().count(OLD_SKILL_NAME)}"
+            ),
+        }
+    )
     return results
 
 
