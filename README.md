@@ -7,6 +7,7 @@
 [![Codex Skill](https://img.shields.io/badge/Codex-Skill-111827)](https://learn.chatgpt.com/docs/customization/overview)
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![Runtime dependencies](https://img.shields.io/badge/runtime%20dependencies-0-2ea44f)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 <!-- section:overview -->
 Wide-Lens Engineering is a reusable Codex workflow for feature implementation, debugging, refactoring, migrations, architecture changes, and code review. It is **not a review-only skill**.
@@ -24,7 +25,60 @@ Most changes need disciplined engineering, not maximum ceremony. This skill keep
 > [!IMPORTANT]
 > `assured` is not a label the agent can award itself. Without a real external controller, independent digest channel, pinned verifier, isolated artifacts, and OS sandbox, the skill must report that assured preconditions are unmet.
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [Trust boundaries](#trust-boundaries) · [Installation](#installation) · [Testing](#testing)
+[Build Week](#build-week) · [Quick start](#quick-start) · [How it works](#how-it-works) · [Trust boundaries](#trust-boundaries) · [Installation](#installation) · [Testing](#testing)
+
+<!-- section:build-week -->
+<a id="build-week"></a>
+## OpenAI Build Week
+
+- **Category:** Developer Tools
+- **Repository:** [github.com/Mai-xiyu/wide-lens-engineering](https://github.com/Mai-xiyu/wide-lens-engineering)
+- **Primary `/feedback` session:** `019f67c4-9bd9-7581-8ae9-3cdd4453d9f7`
+- **Demo video:** the public YouTube link will be added after owner review of the upload draft.
+
+### 60-second deterministic judge check
+
+From the repository root, with Python 3.10 or newer:
+
+```bash
+python -B tests/run_eval.py --threshold 1.0 --json
+python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
+```
+
+The first command checks the planner, routing policy, gate, security boundaries, and documentation contracts. The second runs the command-line surfaces as black boxes and fails if any case is skipped. No sample data, API key, account, third-party Python package, or network call is required.
+
+To exercise the actual Skill in Codex, install it with the request in [Quick start](#quick-start), then use it on a disposable repository with a real failing test:
+
+```text
+Use $wide-lens-engineering to fix the currently failing test.
+Choose assurance, depth, and coordination independently.
+The active main model owns any subagent count; keep subagents read-only.
+Show the pre-edit checkpoint, smallest causal diff, exact test result, and Git diff.
+```
+
+### Built with GPT-5.6 and Codex
+
+The primary build thread above records `gpt-5.6-sol` in its local Codex session metadata throughout the core implementation. Codex performed repository-wide analysis, shared-subagent challenge, protocol and Python implementation, adversarial regression work, bilingual documentation, and terminal-based GitHub delivery. The session ID is supplied for evaluator verification; this README does not treat the model label alone as proof of correctness.
+
+Key decisions made during that build:
+
+| Decision | Why | Trade-off |
+|---|---|---|
+| Separate assurance, analysis depth, and coordination | Risk and information value are different questions | The main model must make three explicit choices |
+| Keep `practical` and `assured` distinct | Ordinary coding stays fast while high-risk work can require external anchors | Full assured delivery needs infrastructure outside this repository |
+| Let the main model choose subagents; keep one writer | Avoid fixed orchestration and concurrent-edit conflicts | Parallel agents provide evidence, not parallel code writes |
+| Apply the Ponytail ladder after causal tracing | Reuse and standard-library solutions stay preferred | Minimalism cannot remove trust-boundary or regression checks |
+
+### Runtime and platform scope
+
+| Surface | Current claim |
+|---|---|
+| Windows, Git, Python 3.10+ | Verified in the release environment, including the forward suite with zero skips |
+| macOS / Linux | POSIX installation and path handling are implemented and documented; not release-verified in this Windows build |
+| Codex Desktop / CLI | Uses the standard Skill layout and can be installed globally or per repository |
+| Assured `windows-win32` controller path | Windows only |
+
+The fixed suites are protocol oracles, not a benchmark of universal model accuracy, defect recall, or independent security assurance.
 
 <!-- section:quick-start -->
 <a id="quick-start"></a>
@@ -293,6 +347,7 @@ A 100% fixed-suite result proves only that every declared oracle passed. It is n
 
 ```text
 wide-lens-engineering/
+├── LICENSE                  # MIT license
 ├── SKILL.md                 # Router and shared engineering rules
 ├── README.md                # English documentation
 ├── README_CN.md             # 简体中文文档

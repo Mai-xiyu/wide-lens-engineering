@@ -1661,6 +1661,7 @@ def run_readme_regressions() -> list[dict[str, Any]]:
 
     expected_sections = [
         "overview",
+        "build-week",
         "quick-start",
         "how-it-works",
         "practical",
@@ -1709,6 +1710,32 @@ def run_readme_regressions() -> list[dict[str, Any]]:
         "bilingual README preserves protocol and minimalism invariants",
         not missing_invariants,
         f"missing={missing_invariants}",
+    )
+
+    license_path = SKILL_DIR / "LICENSE"
+    license_text = license_path.read_text(encoding="utf-8") if license_path.exists() else ""
+    record(
+        "public repository carries an explicit MIT license",
+        "MIT License" in license_text
+        and "Copyright (c) 2026 Mai-xiyu" in license_text
+        and "Permission is hereby granted" in license_text,
+        f"license_exists={license_path.exists()}",
+    )
+
+    build_week_tokens = (
+        "Developer Tools",
+        "GPT-5.6",
+        "gpt-5.6-sol",
+        "019f67c4-9bd9-7581-8ae9-3cdd4453d9f7",
+        "python -B tests/run_eval.py --threshold 1.0 --json",
+        "python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json",
+    )
+    record(
+        "bilingual Build Week evidence and judge commands stay present",
+        all(token in english and token in chinese for token in build_week_tokens)
+        and "No sample data" in english
+        and "不需要样本数据" in chinese,
+        "missing Build Week evidence, session provenance, or deterministic judge path",
     )
 
 

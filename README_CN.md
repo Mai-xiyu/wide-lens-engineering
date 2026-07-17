@@ -7,6 +7,7 @@
 [![Codex Skill](https://img.shields.io/badge/Codex-Skill-111827)](https://learn.chatgpt.com/docs/customization/overview)
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![Runtime dependencies](https://img.shields.io/badge/runtime%20dependencies-0-2ea44f)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 <!-- section:overview -->
 Wide-Lens Engineering 是一个可复用的 Codex 工作流，覆盖功能实现、调试、重构、迁移、架构修改和代码审查。它**不是只用于 review 的 Skill**。
@@ -24,7 +25,60 @@ Wide-Lens Engineering 是一个可复用的 Codex 工作流，覆盖功能实现
 > [!IMPORTANT]
 > `assured` 不是 Agent 可以自行授予的标签。缺少真实外部 controller、独立摘要通道、固定 verifier、隔离工件和 OS sandbox 时，Skill 必须报告 assured 前置条件不成立。
 
-[快速开始](#quick-start) · [工作方式](#how-it-works) · [信任边界](#trust-boundaries) · [安装](#installation) · [测试](#testing)
+[Build Week](#build-week) · [快速开始](#quick-start) · [工作方式](#how-it-works) · [信任边界](#trust-boundaries) · [安装](#installation) · [测试](#testing)
+
+<!-- section:build-week -->
+<a id="build-week"></a>
+## OpenAI Build Week
+
+- **类别：** Developer Tools
+- **代码仓库：** [github.com/Mai-xiyu/wide-lens-engineering](https://github.com/Mai-xiyu/wide-lens-engineering)
+- **主要 `/feedback` 会话：** `019f67c4-9bd9-7581-8ae9-3cdd4453d9f7`
+- **演示视频：** 上传草稿经所有者确认后，将在此补充公开 YouTube 链接。
+
+### 评委 60 秒确定性检查
+
+在仓库根目录使用 Python 3.10 或更高版本运行：
+
+```bash
+python -B tests/run_eval.py --threshold 1.0 --json
+python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
+```
+
+第一条命令检查 planner、路由策略、gate、安全边界和文档合同；第二条以黑盒方式运行命令行入口，并在任何案例跳过时失败。不需要样本数据、API key、账号、第三方 Python 包或网络调用。
+
+要在 Codex 中体验真实 Skill，先按[快速开始](#quick-start)安装，再在一次性仓库中对真实失败测试运行：
+
+```text
+Use $wide-lens-engineering to fix the currently failing test.
+Choose assurance, depth, and coordination independently.
+The active main model owns any subagent count; keep subagents read-only.
+Show the pre-edit checkpoint, smallest causal diff, exact test result, and Git diff.
+```
+
+### 使用 GPT-5.6 与 Codex 构建
+
+上述主要构建会话的本地 Codex session metadata 在核心实现期间持续记录为 `gpt-5.6-sol`。Codex 在该会话内完成了全仓分析、共享 subagent 交叉挑战、协议与 Python 实现、对抗性回归、双语文档以及终端 GitHub 交付。会话 ID 用于评委核验；本 README 不把模型标签本身当成正确性证明。
+
+构建过程中的关键决策：
+
+| 决策 | 原因 | 代价 |
+|---|---|---|
+| 将保证级别、分析深度和协作方式分离 | 风险与信息增益是不同问题 | 主模型必须显式做出三个选择 |
+| 明确区分 `practical` 与 `assured` | 普通编码保持快速，高风险工作可以要求外部锚点 | 完整 assured 交付依赖仓库外基础设施 |
+| subagent 由主模型决定，且只有一个写入者 | 避免固定编排和并发编辑冲突 | 并行 agent 提供证据，不并行写代码 |
+| 因果追踪后再应用 Ponytail 阶梯 | 优先复用与标准库方案 | 最小化不能删除信任边界和回归检查 |
+
+### 运行与平台范围
+
+| 环境 | 当前可声明范围 |
+|---|---|
+| Windows、Git、Python 3.10+ | 已在发布环境验证，包括前向套件 0 跳过 |
+| macOS / Linux | 已实现并记录 POSIX 安装与路径处理；本次 Windows 构建未做发布级实测 |
+| Codex Desktop / CLI | 使用标准 Skill 结构，可全局安装或按仓库安装 |
+| Assured `windows-win32` controller 路径 | 仅限 Windows |
+
+固定测试是协议 oracle，不是通用模型准确率、缺陷召回率或独立安全保证的 benchmark。
 
 <!-- section:quick-start -->
 <a id="quick-start"></a>
@@ -293,6 +347,7 @@ git diff --check
 
 ```text
 wide-lens-engineering/
+├── LICENSE                  # MIT 许可证
 ├── SKILL.md                 # Router and shared engineering rules
 ├── README.md                # English documentation
 ├── README_CN.md             # 简体中文文档
