@@ -34,7 +34,7 @@ Most changes need disciplined engineering, not maximum ceremony. This skill keep
 - **Category:** Developer Tools
 - **Repository:** [github.com/Mai-xiyu/wide-lens-engineering](https://github.com/Mai-xiyu/wide-lens-engineering)
 - **Primary `/feedback` session:** `019f67c4-9bd9-7581-8ae9-3cdd4453d9f7`
-- **Demo video:** the public YouTube link will be added after owner review of the upload draft.
+- **Demo video:** [Wide-Lens Engineering — GPT-5.6 + Codex Build Week Demo](https://youtu.be/rg-BmgUnxL4)
 
 ### 60-second deterministic judge check
 
