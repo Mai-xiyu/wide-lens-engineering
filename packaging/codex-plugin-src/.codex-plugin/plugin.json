@@ -1,7 +1,7 @@
 {
   "name": "wide-lens-engineering",
-  "version": "5.0.0",
-  "description": "Practical and externally anchored software delivery with elastic task-DAG coordination.",
+  "version": "0.1.0",
+  "description": "Opt-in practical and externally anchored software delivery with elastic task-DAG coordination.",
   "author": {
     "name": "Mai-xiyu",
     "url": "https://github.com/Mai-xiyu"
@@ -11,6 +11,8 @@
   "license": "MIT",
   "keywords": [
     "codex-skill",
+    "opt-in-skill",
+    "progressive-disclosure",
     "software-engineering",
     "elastic-agent-teams",
     "task-dag",
@@ -21,8 +23,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Wide-Lens Engineering",
-    "shortDescription": "Elastic engineering with evidence-gated delivery",
-    "longDescription": "Code, debug, refactor, and review through a practical workflow or an externally anchored assured protocol with elastic task-DAG delegation.",
+    "shortDescription": "Opt-in elastic engineering and assured delivery",
+    "longDescription": "Explicitly invoke a practical workflow or externally anchored assured protocol with elastic task-DAG delegation.",
     "developerName": "Mai-xiyu",
     "category": "Developer Tools",
     "capabilities": [
@@ -32,9 +34,9 @@
     ],
     "websiteURL": "https://github.com/Mai-xiyu/wide-lens-engineering",
     "defaultPrompt": [
-      "Fix this bug with the smallest verified change.",
-      "Use elastic read-only peers where they add evidence.",
-      "Plan an assured delivery for this high-risk change."
+      "Use $wide-lens-engineering to fix this bug with the smallest verified change.",
+      "Use $wide-lens-engineering with elastic read-only peers where they add evidence.",
+      "Use $wide-lens-engineering to plan an assured delivery for this high-risk change."
     ],
     "brandColor": "#2563EB"
   }

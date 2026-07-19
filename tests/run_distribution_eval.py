@@ -25,6 +25,18 @@ PORTABLE_PLUGIN_VALIDATOR = SKILL_DIR / "scripts" / "validate_codex_plugin.py"
 PORTABLE_SKILL_VALIDATOR = SKILL_DIR / "scripts" / "validate_skill.py"
 HOOK = SKILL_DIR / "packaging" / "codex-plugin-src" / "hooks" / "wide_lens_peer_hook.py"
 PLUGIN_PREFIX = "plugins/wide-lens-engineering"
+PLUGIN_VERSION = "0.1.0"
+DRIFT_VERSION = "0.1.1"
+sys.path.insert(0, str(SKILL_DIR / "scripts"))
+
+from validate_codex_plugin import (  # noqa: E402
+    ValidationError as PluginValidationError,
+    parse_openai_yaml as parse_plugin_openai_yaml,
+)
+from validate_skill import (  # noqa: E402
+    SkillError,
+    parse_openai_yaml as parse_skill_openai_yaml,
+)
 
 
 def command(arguments: list[str], **kwargs: Any) -> subprocess.CompletedProcess[Any]:
@@ -80,6 +92,42 @@ def run_cases() -> list[dict[str, Any]]:
 
     def record(name: str, passed: bool, detail: str = "") -> None:
         results.append({"name": name, "passed": passed, "detail": detail})
+
+    canonical_openai = (SKILL_DIR / "agents" / "openai.yaml").read_text(encoding="utf-8")
+    openai_mutations = {
+        "true boolean": canonical_openai.replace(
+            "allow_implicit_invocation: false", "allow_implicit_invocation: true", 1
+        ),
+        "quoted false": canonical_openai.replace(
+            "allow_implicit_invocation: false", 'allow_implicit_invocation: "false"', 1
+        ),
+        "comment smuggling": canonical_openai.replace(
+            "  allow_implicit_invocation: false",
+            "  allow_implicit_invocation: true\n# allow_implicit_invocation: false",
+            1,
+        ),
+        "prompt smuggling": canonical_openai.replace(
+            '  default_prompt: "',
+            '  default_prompt: "allow_implicit_invocation: false; ',
+            1,
+        ).replace("  allow_implicit_invocation: false", "  allow_implicit_invocation: true", 1),
+        "duplicate policy": canonical_openai + "policy:\n  allow_implicit_invocation: true\n",
+    }
+    for mutation_name, mutation in openai_mutations.items():
+        source_rejected = False
+        plugin_rejected = False
+        try:
+            parse_skill_openai_yaml(mutation)
+        except SkillError:
+            source_rejected = True
+        try:
+            parse_plugin_openai_yaml(mutation)
+        except PluginValidationError:
+            plugin_rejected = True
+        record(
+            f"strict activation metadata rejects {mutation_name}",
+            source_rejected and plugin_rejected,
+        )
 
     config_text = (SKILL_DIR / ".codex" / "config.toml").read_text(encoding="utf-8")
     compact_config = "".join(line.strip() for line in config_text.splitlines())
@@ -353,6 +401,9 @@ def run_cases() -> list[dict[str, Any]]:
                 marketplace = json.loads(archive.read(".agents/plugins/marketplace.json"))
                 manifest = json.loads(archive.read(f"{PLUGIN_PREFIX}/.codex-plugin/plugin.json"))
                 install_text = archive.read("INSTALL.md").decode("utf-8")
+                packaged_openai_yaml = archive.read(
+                    f"{PLUGIN_PREFIX}/skills/wide-lens-engineering/agents/openai.yaml"
+                ).decode("utf-8")
                 packaged_skill = archive.read(
                     f"{PLUGIN_PREFIX}/skills/wide-lens-engineering/SKILL.md"
                 )
@@ -368,6 +419,11 @@ def run_cases() -> list[dict[str, Any]]:
             record(
                 "plugin copies canonical Skill byte-for-byte",
                 packaged_skill == (SKILL_DIR / "SKILL.md").read_bytes(),
+            )
+            record(
+                "packaged Skill remains explicit opt-in",
+                "allow_implicit_invocation: false" in packaged_openai_yaml
+                and "$wide-lens-engineering" in packaged_openai_yaml,
             )
             record(
                 "marketplace is self-contained and uses default hooks discovery",
@@ -398,13 +454,16 @@ def run_cases() -> list[dict[str, Any]]:
                 "plugin runtime excludes tests and packaging tools",
                 not any(name.startswith("tests/") for name in runtime_names)
                 and "scripts/build_codex_plugin.py" not in runtime_names
-                and "scripts/install_codex_adapter.py" not in runtime_names,
+                and "scripts/install_codex_adapter.py" not in runtime_names
+                and "CONTRIBUTING.md" not in runtime_names,
             )
             expected_keywords = {
                 "elastic-agent-teams",
                 "task-dag",
                 "isolated-candidates",
                 "capability-leases",
+                "opt-in-skill",
+                "progressive-disclosure",
             }
             record(
                 "plugin discovery keywords cover elastic delivery",
@@ -415,7 +474,7 @@ def run_cases() -> list[dict[str, Any]]:
                     str(standalone_validator),
                     str(archive_path),
                     "--expected-version",
-                    "5.0.0",
+                    PLUGIN_VERSION,
                 ],
                 text=True,
             )
@@ -433,7 +492,7 @@ def run_cases() -> list[dict[str, Any]]:
                         str(standalone_validator),
                         str(extracted_root),
                         "--expected-version",
-                        "5.0.0",
+                        PLUGIN_VERSION,
                     ],
                     text=True,
                 )
@@ -442,6 +501,39 @@ def run_cases() -> list[dict[str, Any]]:
                     portable_directory.returncode == 0,
                     portable_directory.stdout + portable_directory.stderr,
                 )
+
+                openai_path = (
+                    extracted_root
+                    / PLUGIN_PREFIX
+                    / "skills"
+                    / "wide-lens-engineering"
+                    / "agents"
+                    / "openai.yaml"
+                )
+                openai_bytes = openai_path.read_bytes()
+                openai_path.write_text(
+                    openai_bytes.decode("utf-8").replace(
+                        "allow_implicit_invocation: false",
+                        "allow_implicit_invocation: true",
+                        1,
+                    ),
+                    encoding="utf-8",
+                    newline="\n",
+                )
+                implicit_activation = command(
+                    [
+                        str(standalone_validator),
+                        str(extracted_root),
+                        "--expected-version",
+                        PLUGIN_VERSION,
+                    ],
+                    text=True,
+                )
+                record(
+                    "portable validator rejects enabling implicit Skill activation",
+                    implicit_activation.returncode != 0,
+                )
+                openai_path.write_bytes(openai_bytes)
 
                 install_path = extracted_root / "INSTALL.md"
                 install_bytes = install_path.read_bytes()
@@ -453,7 +545,7 @@ def run_cases() -> list[dict[str, Any]]:
                         str(standalone_validator),
                         str(extracted_root),
                         "--expected-version",
-                        "5.0.0",
+                        PLUGIN_VERSION,
                     ],
                     text=True,
                 )
@@ -473,7 +565,7 @@ def run_cases() -> list[dict[str, Any]]:
                         str(standalone_validator),
                         str(extracted_root),
                         "--expected-version",
-                        "5.0.0",
+                        PLUGIN_VERSION,
                     ],
                     text=True,
                 )
@@ -495,7 +587,7 @@ def run_cases() -> list[dict[str, Any]]:
                         str(standalone_validator),
                         str(extracted_root),
                         "--expected-version",
-                        "5.0.0",
+                        PLUGIN_VERSION,
                     ],
                     text=True,
                 )
@@ -511,7 +603,7 @@ def run_cases() -> list[dict[str, Any]]:
                         str(standalone_validator),
                         str(extracted_root),
                         "--expected-version",
-                        "5.0.0",
+                        PLUGIN_VERSION,
                     ],
                     text=True,
                 )
@@ -533,7 +625,7 @@ def run_cases() -> list[dict[str, Any]]:
                         str(standalone_validator),
                         str(extracted_root),
                         "--expected-version",
-                        "5.0.0",
+                        PLUGIN_VERSION,
                     ],
                     text=True,
                 )
@@ -555,7 +647,7 @@ def run_cases() -> list[dict[str, Any]]:
                         str(standalone_validator),
                         str(extracted_root),
                         "--expected-version",
-                        "5.0.0",
+                        PLUGIN_VERSION,
                     ],
                     text=True,
                 )
@@ -568,14 +660,14 @@ def run_cases() -> list[dict[str, Any]]:
                 manifest_path = extracted_root / PLUGIN_PREFIX / ".codex-plugin" / "plugin.json"
                 manifest_bytes = manifest_path.read_bytes()
                 bad_manifest = json.loads(manifest_bytes)
-                bad_manifest["version"] = "5.0.1"
+                bad_manifest["version"] = DRIFT_VERSION
                 manifest_path.write_text(json.dumps(bad_manifest), encoding="utf-8")
                 wrong_version = command(
                     [
                         str(standalone_validator),
                         str(extracted_root),
                         "--expected-version",
-                        "5.0.0",
+                        PLUGIN_VERSION,
                     ],
                     text=True,
                 )
@@ -594,7 +686,7 @@ def run_cases() -> list[dict[str, Any]]:
                         str(standalone_validator),
                         str(extracted_root),
                         "--expected-version",
-                        "5.0.0",
+                        PLUGIN_VERSION,
                     ],
                     text=True,
                 )
@@ -620,7 +712,7 @@ def run_cases() -> list[dict[str, Any]]:
                     str(standalone_validator),
                     str(tampered_hook_archive),
                     "--expected-version",
-                    "5.0.0",
+                    PLUGIN_VERSION,
                 ],
                 text=True,
             )
@@ -643,7 +735,7 @@ def run_cases() -> list[dict[str, Any]]:
                     str(standalone_validator),
                     str(tampered_install_archive),
                     "--expected-version",
-                    "5.0.0",
+                    PLUGIN_VERSION,
                 ],
                 text=True,
             )
@@ -664,7 +756,7 @@ def run_cases() -> list[dict[str, Any]]:
                     str(standalone_validator),
                     str(alias_archive),
                     "--expected-version",
-                    "5.0.0",
+                    PLUGIN_VERSION,
                 ],
                 text=True,
             )
@@ -687,7 +779,7 @@ def run_cases() -> list[dict[str, Any]]:
                     str(standalone_validator),
                     str(oversized_archive),
                     "--expected-version",
-                    "5.0.0",
+                    PLUGIN_VERSION,
                 ],
                 text=True,
             )
@@ -703,7 +795,7 @@ def run_cases() -> list[dict[str, Any]]:
                     str(standalone_validator),
                     str(padded_archive),
                     "--expected-version",
-                    "5.0.0",
+                    PLUGIN_VERSION,
                 ],
                 text=True,
             )
@@ -725,7 +817,7 @@ def run_cases() -> list[dict[str, Any]]:
                         str(standalone_validator),
                         str(linked_archive),
                         "--expected-version",
-                        "5.0.0",
+                        PLUGIN_VERSION,
                     ],
                     text=True,
                 )
@@ -747,7 +839,7 @@ def run_cases() -> list[dict[str, Any]]:
                     str(standalone_validator),
                     str(duplicate_archive),
                     "--expected-version",
-                    "5.0.0",
+                    PLUGIN_VERSION,
                 ],
                 text=True,
             )
@@ -756,12 +848,14 @@ def run_cases() -> list[dict[str, Any]]:
             for name in (
                 "plugin archive paths are safe",
                 "plugin copies canonical Skill byte-for-byte",
+                "packaged Skill remains explicit opt-in",
                 "marketplace is self-contained and uses default hooks discovery",
                 "plugin does not claim custom-agent registration",
                 "plugin runtime excludes tests and packaging tools",
                 "plugin discovery keywords cover elastic delivery",
                 "portable validator accepts the release archive",
                 "portable validator accepts the extracted marketplace",
+                "portable validator rejects enabling implicit Skill activation",
                 "portable validator rejects changed installation instructions",
                 "portable validator rejects source.path escape",
                 "portable validator rejects extra runtime files",

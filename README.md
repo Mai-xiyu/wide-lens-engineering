@@ -22,6 +22,8 @@ Wide-Lens Engineering is a reusable Codex Skill for real repository work, not a 
 
 The Skill never prescribes an agent count, fixed team, model, or role roster. The active main model derives the execution mode from observed host capabilities and the frozen task—not from a product name.
 
+Installing the Skill does **not** opt every coding session into this workflow. Its Codex metadata sets `policy.allow_implicit_invocation: false`, so ordinary work stays on the host's normal path. The full Skill body loads only after an explicit `$wide-lens-engineering` invocation, and that router then loads only the selected practical or assured reference.
+
 | Route | Use it for | What the evidence means |
 |---|---|---|
 | `practical` | Local, reversible, clearly scoped work | Checkpoint, commands, and observed Git diff agree |
@@ -66,7 +68,7 @@ path: .
 name: wide-lens-engineering
 ```
 
-Then use it for coding, not only review:
+Then invoke it explicitly for coding, not only review:
 
 ```text
 Use $wide-lens-engineering to fix the failing parser behavior.
@@ -118,7 +120,7 @@ Ponytail constrains both delegation and implementation: do not create a team wit
 
 <!-- section:practical -->
 <a id="practical-workflow"></a>
-## Practical Elastic (v4.1)
+## Practical Elastic
 
 Practical mode publishes a checkpoint containing the objective, non-goals, allowed paths, exact acceptance commands, host capabilities, task DAG, execution mode, and any downgrade reason.
 
@@ -137,7 +139,7 @@ The normative workflow is [references/practical.md](references/practical.md).
 
 <!-- section:assured -->
 <a id="assured-workflow"></a>
-## Assured Elastic (v5)
+## Assured Elastic (protocol v5)
 
 Assured v5 keeps the complete authority contract v1 and baseline manifest v2, then binds orchestration before the first spawn:
 
@@ -152,7 +154,7 @@ Assured v5 keeps the complete authority contract v1 and baseline manifest v2, th
 
 Missing controller, independent digest, isolated workspace, complete event capture, independent verifier, or OS sandbox is a hard failure. It cannot silently downgrade and still claim `assured`.
 
-Task-graph revisions in v5.0 are pre-dispatch only: a revision preserves `version`, `packet_sha256`, `mode`, `execution`, `dispatch`, `communication`, all prior tasks, and all prior assignments; it may only append new nodes. The controller must attest `predecessor_execution_started=false`. Once an actor has spawned, use a fresh assured execution epoch rather than mixing two envelope authorities in one receipt.
+Task-graph revisions in protocol v5 are pre-dispatch only: a revision preserves `version`, `packet_sha256`, `mode`, `execution`, `dispatch`, `communication`, all prior tasks, and all prior assignments; it may only append new nodes. The controller must attest `predecessor_execution_started=false`. Once an actor has spawned, use a fresh assured execution epoch rather than mixing two envelope authorities in one receipt.
 
 Read [references/protocol-v5.md](references/protocol-v5.md). The frozen legacy format remains documented at [references/protocol.md](references/protocol.md); v5 files and arguments are invalid on the v4 CLI.
 
@@ -168,7 +170,7 @@ The skill contains no exact, default, or maximum participant count.
 
 Tasks are not agents: one agent can execute several ready DAG nodes, and a task can remain with the main thread. The first release forbids recursive delegation; every child is directly managed by the main model.
 
-For `shared` coordination, Round 1 positions are sealed. Only afterward may the controller expose a complete peer board or permit peer messaging. Peer messages are untrusted evidence, not authority; adjudication uses discriminating checks rather than votes or confidence. In v5.0, dependent shared tasks use `root-relay`; `peer-message` is limited to dependency-free rounds because every sender must retain an active lease through the exchange.
+For `shared` coordination, Round 1 positions are sealed. Only afterward may the controller expose a complete peer board or permit peer messaging. Peer messages are untrusted evidence, not authority; adjudication uses discriminating checks rather than votes or confidence. In protocol v5, dependent shared tasks use `root-relay`; `peer-message` is limited to dependency-free rounds because every sender must retain an active lease through the exchange.
 
 <!-- invariant:subagents-read-only -->
 <!-- invariant:no-recursive-delegation -->
@@ -236,7 +238,7 @@ Requirements: Codex, Git, Python 3.10+, and no third-party Python runtime depend
 
 ### 1. Skill only
 
-Use the installer request from [Quick start](#quick-start), or clone the repository into a recognized Skills directory. The repository root is the one canonical Skill; there is no nested duplicate `SKILL.md`.
+Use the installer request from [Quick start](#quick-start), or clone the repository into a recognized Skills directory. The repository root is the one canonical Skill; there is no nested duplicate `SKILL.md`. The router stays small while practical, assured, and legacy details live in separate references and load only when selected.
 
 ### 2. Codex project adapter
 
@@ -254,11 +256,11 @@ The adapter writes only `.codex/config.toml` with `agents.max_depth = 1` and `.c
 Build a deterministic archive from the canonical root Skill:
 
 ```bash
-python scripts/build_codex_plugin.py --version 5.0.0 --output-dir dist \
+python scripts/build_codex_plugin.py --version 0.1.0 --output-dir dist \
   --validator scripts/validate_codex_plugin.py --force
 python scripts/validate_codex_plugin.py \
-  dist/wide-lens-engineering-marketplace-5.0.0.zip \
-  --expected-version 5.0.0
+  dist/wide-lens-engineering-marketplace-0.1.0.zip \
+  --expected-version 0.1.0
 ```
 
 The release validator pins the complete plugin manifest, hook registration, hook implementation, and every runtime file by version. It can be copied and run independently of this source checkout; an unknown release version fails closed.
@@ -276,28 +278,20 @@ Installing or enabling a plugin does not make its hooks trusted. Use `/hooks` to
 
 Generated archives live in ignored `dist/`, so packaging never creates a second maintained source tree.
 
+### Versioning
+
+The first public-preview package target is `0.1.0`. Package SemVer is independent of wire schemas: packet v5 remains protocol `version: 5`, and the frozen compatibility path remains packet v4. Use `1.0.0` only after the public installation/workflow contract is stable and the externally authorized live release gate has passed; do not rename protocol v5 to match the package.
+
 <!-- section:testing -->
 <a id="testing"></a>
 ## Testing
 
-Release gates:
+The full maintainer matrix, reproducible packaging commands, and release policy live in [CONTRIBUTING.md](CONTRIBUTING.md), outside the runtime Skill. A short local check is:
 
 ```bash
 python -B tests/run_eval.py --threshold 1.0 --json
 python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
-python -B tests/run_v5_eval.py --threshold 1.0 --json
-python -B tests/run_distribution_eval.py --threshold 1.0 --json
-python -B tests/run_platform_eval.py --json
-python -B tests/run_codex_live_harness_eval.py --threshold 1.0 --json
-python -B tests/run_stat_eval.py --require-all --json
-python -B tests/run_perf_eval.py --json
 python -B scripts/validate_skill.py .
-python -B scripts/build_codex_plugin.py --version 5.0.0 --output-dir dist \
-  --validator scripts/validate_codex_plugin.py --force
-python -B scripts/validate_codex_plugin.py \
-  dist/wide-lens-engineering-marketplace-5.0.0.zip \
-  --expected-version 5.0.0
-git diff --check
 ```
 
 The 150-task suite freezes 25 semantically unique tasks in each of
@@ -321,6 +315,7 @@ The separate live runner is documented at [benchmarks/codex-live-v1](benchmarks/
 wide-lens-engineering/
 ├── SKILL.md                         # canonical router and engineering workflow
 ├── README.md / README_CN.md         # reader documentation
+├── CONTRIBUTING.md                  # maintainer tests, versions, and release policy
 ├── .codex/                          # optional project adapter
 ├── agents/openai.yaml               # Codex Skill UI metadata
 ├── references/

@@ -30,12 +30,12 @@ RUNTIME_FILES = {
     "scripts/check_delivery_v5.py",
 }
 RUNTIME_SHA256 = {
-    "SKILL.md": "9e4b960236a6f8ee784c9adc5df2114bd203b3d1f90fd2afeaafdfd4eb5027a1",
+    "SKILL.md": "86331b74ff21c43ab48a1d3810e5f2ad28187bfd60672370f52caaeff7229dd8",
     "LICENSE": "6bb2dd9d8f7849c4385ae95d83fccbfd7e719a59ddbc9d396fafde31a9cd5b9a",
-    "agents/openai.yaml": "da0014061e2c219abf88b6e3611c80100d9ad53af1d4e2a04095dd5d6c00c43b",
+    "agents/openai.yaml": "c47219f4976f01da7d714c842fbafdcb7a242503d95dcce16880c4f0bd38d82b",
     "references/practical.md": "56caa2513aca4148b5864cbef6cb028d01d1f14ff9196367f5ca9c801f2e2d44",
     "references/protocol.md": "775ad630a92b91009506314fc63747c4b1d9395e746f0a102ad41b4934edf639",
-    "references/protocol-v5.md": "a8bf68d2d3e95900a4910610a29c50b510153645afd9d8ac21ebcf8e85b07e8a",
+    "references/protocol-v5.md": "3c4acdbbe1b1efbaf150467aa959cf5382351bf67660309366460d8224087c32",
     "references/lenses.json": "19b776e9d74c35dd6b5004aa0447db840b0c4c2f1aafa3b4fd1c38f4a8f58518",
     "scripts/diverge.py": "b34d33923f6750dd5e41bcb27da830956506ad962562b4cdf281e146571a8f47",
     "scripts/diverge_v5.py": "cd342f7259671c471ede89db30b95be7aabfd9b0ca6577c32477a55d6715457b",
@@ -44,9 +44,9 @@ RUNTIME_SHA256 = {
 }
 PEER_HOOK_SHA256 = "28db7623d7d39d8d31f76aa145ec5e09f65373470b8fb9db70e0b53596c88427"
 CONTROL_SHA256 = {
-    "5.0.0": {
+    "0.1.0": {
         ".codex-plugin/plugin.json": (
-            "6bcd92b85648d90e9e230bdae0d042dc7203d87d2997a84e2ee93904d69ebd33"
+            "9a7e194978e7d882c616bb4b1931369a9cfe89c2a9d6d9d424f1251086b3fdab"
         ),
         "hooks/hooks.json": (
             "69cd2c39c44c623ba9e39428ba33914b66df48b251f84b0851ec08e804a36847"
@@ -55,7 +55,7 @@ CONTROL_SHA256 = {
     }
 }
 INSTALL_SHA256 = {
-    "5.0.0": "75ddc8d510cc28c71a12e4ddabe13d5fd5fafa9c25282e1f14cfb0a4d5eb2f61"
+    "0.1.0": "75ddc8d510cc28c71a12e4ddabe13d5fd5fafa9c25282e1f14cfb0a4d5eb2f61"
 }
 SEMVER_RE = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
@@ -70,6 +70,42 @@ MAX_COMPRESSION_RATIO = 200
 
 class ValidationError(RuntimeError):
     """Marketplace archive violates its release contract."""
+
+
+def parse_openai_yaml(text: str) -> dict[str, str | bool]:
+    """Validate the exact dependency-free Skill activation metadata shape."""
+    lines = text.splitlines()
+    if len(lines) != 6 or lines[0] != "interface:" or lines[4] != "policy:":
+        raise ValidationError("agents/openai.yaml must use the exact interface/policy shape")
+
+    values: dict[str, str | bool] = {}
+    for index, name in (
+        (1, "display_name"),
+        (2, "short_description"),
+        (3, "default_prompt"),
+    ):
+        prefix = f"  {name}: "
+        if not lines[index].startswith(prefix):
+            raise ValidationError(f"agents/openai.yaml is missing canonical {name}")
+        raw = lines[index][len(prefix) :]
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValidationError(
+                f"agents/openai.yaml {name} must be one JSON-quoted string"
+            ) from exc
+        if not isinstance(value, str) or not value:
+            raise ValidationError(f"agents/openai.yaml {name} must be a non-empty string")
+        values[name] = value
+
+    if lines[5] != "  allow_implicit_invocation: false":
+        raise ValidationError(
+            "agents/openai.yaml must set boolean allow_implicit_invocation to false"
+        )
+    if "$wide-lens-engineering" not in str(values["default_prompt"]):
+        raise ValidationError("agents/openai.yaml must preserve explicit Skill invocation")
+    values["allow_implicit_invocation"] = False
+    return values
 
 
 def strict_json(path: Path) -> Any:
@@ -174,7 +210,7 @@ def expected_plugin_manifest(version: str) -> dict[str, Any]:
         "name": PLUGIN_NAME,
         "version": version,
         "description": (
-            "Practical and externally anchored software delivery with elastic "
+            "Opt-in practical and externally anchored software delivery with elastic "
             "task-DAG coordination."
         ),
         "author": {
@@ -186,6 +222,8 @@ def expected_plugin_manifest(version: str) -> dict[str, Any]:
         "license": "MIT",
         "keywords": [
             "codex-skill",
+            "opt-in-skill",
+            "progressive-disclosure",
             "software-engineering",
             "elastic-agent-teams",
             "task-dag",
@@ -196,10 +234,10 @@ def expected_plugin_manifest(version: str) -> dict[str, Any]:
         "skills": "./skills/",
         "interface": {
             "displayName": "Wide-Lens Engineering",
-            "shortDescription": "Elastic engineering with evidence-gated delivery",
+            "shortDescription": "Opt-in elastic engineering and assured delivery",
             "longDescription": (
-                "Code, debug, refactor, and review through a practical workflow or an "
-                "externally anchored assured protocol with elastic task-DAG delegation."
+                "Explicitly invoke a practical workflow or externally anchored assured "
+                "protocol with elastic task-DAG delegation."
             ),
             "developerName": "Mai-xiyu",
             "category": "Developer Tools",
@@ -210,9 +248,9 @@ def expected_plugin_manifest(version: str) -> dict[str, Any]:
             ],
             "websiteURL": "https://github.com/Mai-xiyu/wide-lens-engineering",
             "defaultPrompt": [
-                "Fix this bug with the smallest verified change.",
-                "Use elastic read-only peers where they add evidence.",
-                "Plan an assured delivery for this high-risk change.",
+                "Use $wide-lens-engineering to fix this bug with the smallest verified change.",
+                "Use $wide-lens-engineering with elastic read-only peers where they add evidence.",
+                "Use $wide-lens-engineering to plan an assured delivery for this high-risk change.",
             ],
             "brandColor": "#2563EB",
         },
@@ -336,6 +374,11 @@ def validate_directory(root: Path, expected_version: str) -> dict[str, Any]:
             raise ValidationError(
                 f"packaged runtime differs from its pinned release bytes: {relative_text}"
             )
+    try:
+        openai_text = (skill_root / "agents" / "openai.yaml").read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValidationError("agents/openai.yaml must be valid UTF-8") from exc
+    parse_openai_yaml(openai_text)
 
     required = required_files()
     if files != required:

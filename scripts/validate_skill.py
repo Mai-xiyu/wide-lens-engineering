@@ -30,6 +30,39 @@ class SkillError(RuntimeError):
     """Canonical Skill source is incomplete or malformed."""
 
 
+def parse_openai_yaml(text: str) -> dict[str, str | bool]:
+    """Parse the intentionally tiny openai.yaml subset without YAML dependencies."""
+    lines = text.splitlines()
+    if len(lines) != 6 or lines[0] != "interface:" or lines[4] != "policy:":
+        raise SkillError("agents/openai.yaml must use the exact interface/policy shape")
+
+    values: dict[str, str | bool] = {}
+    scalar_fields = (
+        (1, "display_name"),
+        (2, "short_description"),
+        (3, "default_prompt"),
+    )
+    for index, name in scalar_fields:
+        prefix = f"  {name}: "
+        if not lines[index].startswith(prefix):
+            raise SkillError(f"agents/openai.yaml is missing canonical {name}")
+        raw = lines[index][len(prefix) :]
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise SkillError(f"agents/openai.yaml {name} must be one JSON-quoted string") from exc
+        if not isinstance(value, str) or not value:
+            raise SkillError(f"agents/openai.yaml {name} must be a non-empty string")
+        values[name] = value
+
+    if lines[5] != "  allow_implicit_invocation: false":
+        raise SkillError("agents/openai.yaml must set boolean allow_implicit_invocation to false")
+    if "$wide-lens-engineering" not in str(values["default_prompt"]):
+        raise SkillError("agents/openai.yaml must preserve explicit Skill invocation")
+    values["allow_implicit_invocation"] = False
+    return values
+
+
 def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
     lines = text.splitlines()
     if not lines or lines[0] != "---":
@@ -64,11 +97,20 @@ def validate(root: Path) -> dict[str, object]:
     description = metadata["description"]
     if not description or len(description) > 1024 or "<" in description or ">" in description:
         raise SkillError("Skill description is empty, too long, or contains angle brackets")
+    if not description.startswith("Opt-in ") or "Do not invoke implicitly" not in description:
+        raise SkillError("Skill description must declare explicit opt-in activation")
     if not body.strip():
         raise SkillError("Skill body is empty")
+    if len(text.encode("utf-8")) > 8_000:
+        raise SkillError("SKILL.md must remain a compact progressive-disclosure router")
+    maintainer_tokens = ("tests/run_", "build_codex_plugin.py", "validate_codex_plugin.py")
+    if any(token in body for token in maintainer_tokens):
+        raise SkillError("SKILL.md must not embed maintainer test or release commands")
     missing = sorted(name for name in REQUIRED if not (root / name).is_file())
     if missing:
         raise SkillError(f"required Skill files are missing: {missing}")
+    openai_yaml = (root / "agents" / "openai.yaml").read_text(encoding="utf-8")
+    openai_metadata = parse_openai_yaml(openai_yaml)
     checked_links = 0
     for target in MARKDOWN_LINK_RE.findall(body):
         if "://" in target or target.startswith(("#", "mailto:")):
@@ -87,6 +129,8 @@ def validate(root: Path) -> dict[str, object]:
     return {
         "name": metadata["name"],
         "description_chars": len(description),
+        "router_bytes": len(text.encode("utf-8")),
+        "implicit_invocation": openai_metadata["allow_implicit_invocation"],
         "required_files": len(REQUIRED),
         "checked_links": checked_links,
     }

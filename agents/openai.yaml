@@ -1,4 +1,6 @@
 interface:
   display_name: "Wide-Lens Engineering"
-  short_description: "Elastic coding with optional assured delivery"
-  default_prompt: "Use $wide-lens-engineering to select practical or assured, focused or full, and independent or shared separately. Let the active main model choose whether to delegate and choose every subagent identity, count, model, and task assignment from observed host capabilities and marginal value. Keep analysis workers read-only; permit candidate writes only in a controller-proven isolated workspace; keep the main integrator as the only canonical writer; fail closed when assured v5 anchors are missing."
+  short_description: "Opt-in elastic coding and assured delivery"
+  default_prompt: "Use $wide-lens-engineering for this task. Select practical or assured after inspecting risk, load only the selected workflow reference, let the active main model decide whether and how to delegate, keep one canonical writer, and verify the final integrated state."
+policy:
+  allow_implicit_invocation: false

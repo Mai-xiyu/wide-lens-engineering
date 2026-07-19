@@ -1,120 +1,83 @@
 ---
 name: wide-lens-engineering
-description: Deliver software changes, debugging, refactors, migrations, architecture work, and reviews through a practical low-overhead workflow or an externally anchored assured workflow. Use for coding, code review, root-cause debugging, adversarial analysis, forced divergent thinking, elastic task-DAG delegation, isolated candidate implementations, or shared-subagent deliberation. Default to practical only for local, reversible, clearly scoped work; require assured for security, credentials, privacy, data migration, concurrency, public APIs, deployment, irreversible effects, or explicit immutable/audit/attestation requests. Do not use for non-software or explanation-only requests.
+description: "Opt-in engineering workflow for explicit Wide-Lens requests: practical or externally anchored assured delivery, elastic task-DAG subagents, sealed adversarial analysis, and isolated candidates. Do not invoke implicitly for ordinary coding, review, explanation-only, or non-software tasks."
 ---
 
 # Wide-Lens Engineering
 
-Deliver the smallest correct change while matching ceremony to risk. Keep ordinary coding fast; reserve the externally anchored v5 protocol for work that needs its trust properties. Keep v4 only as a byte-compatible legacy verifier path.
+Use this Skill only after the user explicitly invokes `$wide-lens-engineering` or explicitly asks for the Wide-Lens workflow. The Codex metadata disables implicit invocation. If this Skill is selected accidentally, return to the host's ordinary workflow without loading any reference.
 
-## Select intent and three axes
+This file is a router, not the complete protocol. Load exactly one current workflow reference after choosing the route. Keep legacy v4 material unloaded unless an existing v4 artifact must be reproduced or verified.
+
+## Select intent and independent axes
 
 Choose one intent:
 
-- `change`: implement, refactor, migrate, or change architecture.
-- `debug`: reproduce, locate the earliest shared cause, fix it, and preserve regression evidence.
-- `review`: inspect and report; do not write.
+- `change`: implement, refactor, migrate, or change architecture;
+- `debug`: reproduce, find the earliest shared cause, fix it, and keep regression evidence;
+- `review`: inspect and report without writing.
 
-Choose these axes separately before a repository write or subagent launch:
+Choose these axes independently before a repository write or subagent launch:
 
 - `assurance`: `practical | assured`
 - `depth`: `focused | full`
 - `coordination`: `independent | shared`
 
-After inspecting actual host capabilities, derive one execution mode; this is not a fourth user axis:
+Derive execution from observed host capabilities; it is not a fourth user axis:
 
 - `main-only`
 - `read-only-proposals`
 - `isolated-candidates`
 
-### Choose assurance
+Depth does not choose assurance or coordination. Coordination does not prescribe execution or participant count.
 
-Use `practical` only when all of these hold:
+### Assurance route
 
-- the change is local, reversible, and has no external side effect;
-- objective, allowed paths, and exact acceptance commands are clear before editing;
-- no security, authorization, credential, privacy, compliance, persistent-data, schema-migration, deletion/recovery, concurrency, distributed-consistency, public-API, deployment, infrastructure, or irreversible boundary is involved;
-- the user did not request an immutable contract, external proof, audit, attestation, or high-assurance delivery.
+Use `practical` for local, reversible, clearly scoped work whose acceptance can be observed directly in the repository.
 
-Use `assured` if any condition above fails, a high-impact classification is uncertain, acceptance touches network/credentials/repository-external state, scope or acceptance must materially change, or shared analysis leaves a high-impact contradiction unresolved. Never silently downgrade an explicit or required `assured` workflow. If its controller, independent digest channel, pinned verifier, artifact isolation, or OS sandbox is unavailable, report that the assured preconditions are unmet.
+Use `assured` for security or credential boundaries, privacy/compliance, persistent-data or schema-migration risk, concurrency/distributed consistency, a public-api or deployment boundary, irreversible effects, an uncertain high-impact classification, or an explicit immutable/audit/attestation request. Never silently downgrade required or requested assurance. When the external trust root is unavailable, report that the assured preconditions are unmet rather than manufacturing a claim.
 
-### Choose depth
+### Depth route
 
-Use `focused` for an isolated correction with a short causal surface. Map the real entry point, shared correction point, direct consumers, failure path, smallest counterexample, and independent verification oracle.
+Use `focused` for an isolated correction with a short causal surface. Trace the real entry point, shared correction point, direct consumers, failure path, smallest counterexample, and an independent oracle.
 
-Use `full` for cross-module, ambiguous, high-blast-radius, or adversarial work. Add contract boundaries, relevant risk lenses, rollback/operability, and one orthogonal frame. Depth does not choose assurance or coordination.
+Use `full` for cross-module, ambiguous, high-blast-radius, or adversarial work. Add only relevant risk lenses and one orthogonal frame.
 
-For the legacy assured v4 adapter only:
+### Coordination route
 
-- map `focused` to wire `profile=light` only when risk is low, coordination is independent, and no triggered lane would be hidden;
-- otherwise map to wire `profile=full` and disclose the compatibility promotion;
-- map `full` to wire `profile=full`;
-- never add `assurance` or `depth` fields to v4 contract, packet, receipt, or report schemas.
+The active main model alone decides whether to use subagents and, if used, their identities, count, and lane assignments. This Skill contains no exact, default, or maximum participant count. Tasks and agents are not one-to-one.
 
-### Choose coordination
+Select `shared` only when sealed independent positions followed by peer challenge are likely to add discriminating evidence. Otherwise select `independent`. Do not create a team merely because the host can spawn one.
 
-The active main model alone decides whether to use subagents and, if used, their identities, count, and lane assignments. Decide from marginal information value, causal breadth, uncertainty, available concurrency, latency, and cost. Never encode an exact, default, or maximum participant count in this Skill or its artifacts. Shared coordination requires at least two identities only because one participant is not a discussion.
+## Load one workflow
 
-Accept an optional aggregate resource envelope only from the user, controller, or runtime. Do not invent one, derive participant count from it, or treat spend as a quality metric. Stop delegation when selected evidence lanes are covered and no high-impact contradiction remains.
+- For `practical`, read [references/practical.md](references/practical.md) completely and follow it. Do not load an assured protocol.
+- For new `assured` work, read [references/protocol-v5.md](references/protocol-v5.md) completely before baseline capture, artifact creation, editing, or delegation.
+- Read frozen [references/protocol.md](references/protocol.md) only to reproduce or verify a legacy v4 artifact. Never add v5 fields to v4 artifacts.
 
-Before delegation, record every `HostCapabilities` value from the runtime or controller: `spawn`, `join`, `steer_child`, `peer_message`, `atomic_task_claim`, `per_spawn_model`, `enforced_readonly`, `isolated_candidate_workspace`, `canonical_write_block`, `independent_verifier`, and `max_depth_control`. Treat missing or unknown values as `false`; never infer them from a product or version name.
+The selected reference owns detailed capability negotiation, task-DAG rules, candidate isolation, receipts, validation, and reporting. Do not duplicate those details here.
 
-The active main model creates an acyclic task DAG and chooses whether delegation has enough marginal information value. It also chooses runtime identities, participant count, models, reasoning levels, and task assignments. The Skill prescribes none of those. Tasks and agents are not one-to-one. Use `root-assign` unless the host truly exposes atomic task claiming. Shared discussion requires either peer messaging or child steering; otherwise use sealed independent evidence and record the downgrade. In assured v5, route shared DAGs with dependencies through `root-relay`; `peer-message` is limited to dependency-free rounds so every sender can remain under an active lease. Prohibit recursive delegation in this release.
+## Preserve these invariants
 
-Use `main-only` when delegation has no marginal value. Use `read-only-proposals` when workers cannot write a proven isolated candidate workspace. Use `isolated-candidates` only when the host enforces candidate isolation and blocks canonical writes. A candidate worker may write only its isolated copy; the main integrator remains the only canonical writer. Never call a Git worktree an assured sandbox. Resolve disagreements with discriminating evidence, never votes or confidence.
+1. Read applicable repository policy and preserve pre-existing work.
+2. Treat unknown host capabilities as unavailable; never infer them from a product or version name.
+3. Only the main integrator writes the canonical checkout. Analysis workers are read-only. Candidate workers may write only a host-proven isolated disposable workspace and never the canonical checkout.
+4. Do not recursively delegate in this release.
+5. A shared round seals independent positions before cross-agent challenge. Resolve contradictions with discriminating evidence, never votes or confidence.
+6. A practical checkpoint is procedural evidence, not an attestation. Assured claims require the external controller, independent digest channel, pinned verifier, artifact isolation, and OS sandbox described by protocol v5.
+7. For debugging, fix the earliest shared cause rather than patching visible callers one by one.
+8. Verify the final integrated state with the frozen acceptance checks and inspect the actual diff before claiming completion.
 
-## Route with progressive disclosure
+Apply the embedded Ponytail convergence rule after understanding the causal surface:
 
-Read only the selected workflow reference before acting:
-
-- For `practical`, read [references/practical.md](references/practical.md). Do not load an assured protocol merely because this Skill triggered.
-- For new `assured` work, read [references/protocol-v5.md](references/protocol-v5.md) completely before baseline capture, artifact creation, editing, or delegation. Treat its controller, digest channel, verifier, artifact store, isolated candidate service, and OS sandbox as the trust root.
-- Read frozen [references/protocol.md](references/protocol.md) only to verify or reproduce a legacy v4 artifact. Do not add v5 fields to v4 artifacts.
-
-Do not mix trust claims. A practical checkpoint is procedural evidence, not an immutable packet or attestation. An assured run that lacks its external trust root is not assured.
-
-## Apply universal engineering rules
-
-Before acting:
-
-1. Read every applicable `AGENTS.md` and repository policy.
-2. Inspect the initial repository state and preserve unrelated user changes.
-3. Trace inputs, callers, state, outputs, consumers, failure paths, deployment surfaces, and relevant tests in proportion to selected depth.
-4. Separate sourced requirements from inference. Ask for approval when an inference would determine acceptance, write scope, a non-goal, or a safety boundary.
-
-Apply Ponytail `full` after understanding the flow. Stop at the first rung that holds:
-
-1. `not-needed`
-2. `reuse`
-3. `stdlib`
-4. `native`
-5. `existing-dependency`
-6. `minimal-custom`
-
-Never simplify away a trust-boundary check, data-loss guard, required error path, accessibility requirement, explicit acceptance criterion, or the smallest useful regression.
-
-Only the main thread writes the canonical checkout. A practical candidate uses a published host-isolated assignment; an assured v5 candidate additionally requires a controller lease and externally anchored isolation. Either candidate may write only its disposable workspace, and its bundle is untrusted input until the main integrator checks base, paths, diff, and scope. Remain inside the selected workflow's approved scope, handle failure paths, and re-read the integrated diff. For debugging, fix the earliest shared cause rather than one visible caller. For review, write nothing.
-
-Report actual changed paths, exact command outcomes, counterevidence sought, unresolved risks, and the selected assurance/depth/coordination. Do not claim completion while an exact acceptance command fails or a high-impact contradiction remains.
-
-## Validate this Skill after changes
-
-These commands apply when modifying the source repository. Release plugins intentionally omit repository tests and packaging tools.
-
-Run:
-
-```bash
-python -B tests/run_eval.py --threshold 1.0 --json
-python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
-python -B tests/run_v5_eval.py --threshold 1.0 --json
-python -B tests/run_distribution_eval.py --threshold 1.0 --json
-python -B tests/run_platform_eval.py --json
-python -B tests/run_codex_live_harness_eval.py --threshold 1.0 --json
-python -B tests/run_stat_eval.py --require-all --json
-python -B tests/run_perf_eval.py --json
-python -B scripts/validate_skill.py .
-python -B scripts/build_codex_plugin.py --version 5.0.0 --output-dir dist --validator scripts/validate_codex_plugin.py --force
-python -B scripts/validate_codex_plugin.py dist/wide-lens-engineering-marketplace-5.0.0.zip --expected-version 5.0.0
+```text
+not-needed -> reuse -> stdlib -> native -> existing-dependency -> minimal-custom
 ```
 
-Keep deterministic fixture thresholds at `1.0`. The statistical runner must pass all 150 semantically distinct frozen protocol/controller tasks before its one-sided 95% exact lower bound exceeds 98%. It does not invoke a coding model and is not live coding accuracy. `run_codex_live_harness_eval.py` tests the live runner itself without calling a model. A formal v5 release separately requires 150/150 externally controlled live coding results, a controller-signed commit-bound anchor, and authorization by a protected external environment; `run_codex_live_eval.py` validates the receipt but cannot self-authorize. Local mode can never authorize a release. None of these results is universal defect recall or model accuracy.
+Stop at the first rung that satisfies acceptance. Do not load another minimalism Skill merely because this rule was inspired by Ponytail; load `$ponytail` only when the user explicitly asks for it. Never simplify away a trust-boundary check, data-loss guard, required failure path, accessibility requirement, explicit acceptance criterion, or the smallest useful regression.
+
+## Report
+
+Report the selected intent, assurance, depth, coordination, derived execution mode, actual changed paths, exact command outcomes, counterevidence sought, and unresolved risks. When delegation was used, also report the observed capabilities, task-DAG revision, assignments, downgrade reasons, and candidate dispositions required by the selected workflow.
+
+Do not claim completion while an exact acceptance command fails or a high-impact contradiction remains. Do not upgrade practical evidence into an assured claim.
