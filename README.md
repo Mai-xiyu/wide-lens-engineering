@@ -43,7 +43,7 @@ Installing the Skill does **not** opt every coding session into this workflow. I
 - **Category:** Developer Tools
 - **Repository:** [github.com/Mai-xiyu/wide-lens-engineering](https://github.com/Mai-xiyu/wide-lens-engineering)
 - **Primary `/feedback` session:** `019f67c4-9bd9-7581-8ae9-3cdd4453d9f7`
-- **Demo:** [Wide-Lens Engineering — GPT-5.6 + Codex](https://youtu.be/rg-BmgUnxL4)
+- **Demo:** [Wide-Lens Engineering — Controlled Elastic Agent Delivery with GPT-5.6 + Codex](https://youtu.be/EuTyn99DTOg)
 - **Recorded build model:** `gpt-5.6-sol`
 
 The model label and session ID are provenance, not correctness proof. The 60-second legacy judge path is:
