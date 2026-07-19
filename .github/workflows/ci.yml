@@ -1,0 +1,57 @@
+name: release-gates
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  common-and-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+      - name: Legacy deterministic gate
+        run: python -B tests/run_eval.py --threshold 1.0 --json
+      - name: Legacy forward gate
+        run: python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
+      - name: Assured v5 deterministic gate
+        run: python -B tests/run_v5_eval.py --threshold 1.0 --json
+      - name: Common and native applicability manifest
+        run: python -B tests/run_platform_eval.py --json
+      - name: Distribution and adapter gate
+        run: python -B tests/run_distribution_eval.py --threshold 1.0 --json
+      - name: Live benchmark harness gate (no model call)
+        run: python -B tests/run_codex_live_harness_eval.py --threshold 1.0 --json
+      - name: Tests leave the checkout clean
+        run: python -c "import subprocess,sys; value=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'], text=True); print(value, end=''); sys.exit(bool(value))"
+
+  frozen-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+      - name: Frozen 150-task protocol/controller benchmark
+        run: python -B tests/run_stat_eval.py --require-all --json
+      - name: Benchmark leaves the checkout clean
+        run: python -c "import subprocess,sys; value=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'], text=True); print(value, end=''); sys.exit(bool(value))"
