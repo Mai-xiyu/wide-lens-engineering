@@ -33,12 +33,18 @@ assurance: practical
 intent: change | debug | review
 depth: focused | full
 coordination: independent | shared
+execution: main-only | read-only-proposals | isolated-candidates
 objective: ...
 non-goals: ...
 allowed paths: ...
 exact acceptance commands: ...
 assumptions: ...
 pre-existing dirty paths: ...
+host capabilities: {all eleven known boolean values}
+task DAG revision/digest: ... | none
+dispatch: root-assign | atomic-claim | none
+communication: root-relay | peer-message | none
+downgrade reason: ... | none
 ```
 
 The checkpoint is procedural, not externally authenticated. If objective, non-goals, allowed paths, acceptance, or a safety boundary must change, publish the proposed revision and obtain user approval before continuing. Never rewrite it only in the final report.
@@ -53,20 +59,46 @@ For `full`, do the focused map and then add only relevant contract, compatibilit
 
 For debugging, reproduce first and fix the earliest shared cause. A local symptom is not the analysis boundary.
 
-## 3. Coordinate only when it adds information
+## 3. Negotiate capabilities and coordinate only when it adds information
 
 The active main model chooses independent or shared coordination, then chooses every participant identity, count, and lane assignment. The Skill supplies no exact, default, or maximum count and no formula that derives count from budget.
 
 If the user, controller, or runtime supplies an aggregate deadline, token, cost, or tool-call envelope, stay within it while preserving the main model's selection authority. Stop when evidence lanes are covered.
 
-Keep subagents read-only, prohibit recursive delegation, and keep the main thread as the only writer. For shared work:
+Record this exact capability vocabulary before spawning: `spawn`, `join`, `steer_child`, `peer_message`, `atomic_task_claim`, `per_spawn_model`, `enforced_readonly`, `isolated_candidate_workspace`, `canonical_write_block`, `independent_verifier`, and `max_depth_control`. Every value is boolean. Unknown or absent means `false`; product names and version strings are not capability evidence.
+
+Derive execution from evidence:
+
+- `main-only`: use when delegation has no marginal value or spawn/join is unavailable;
+- `read-only-proposals`: workers inspect and return findings, plans, or patch text; only the main thread applies changes;
+- `isolated-candidates`: use only when the host provides a real isolated candidate workspace and blocks canonical writes. Candidate workers may write their isolated copy, never the canonical checkout.
+
+Git worktrees can reduce practical file conflicts, but linked worktrees share Git common metadata. They are not an assured security boundary. Never describe `read-only-proposals` as isolated candidate execution.
+
+Before dispatch, publish an acyclic `CoordinationPlan` whose tasks have unique `id`, `objective`, `dependencies`, `read_paths`, `candidate_write_paths`, `acceptance_ids`, and `output_contract`. Publish assignments separately with `task_id`, runtime identity, and only host-supported optional model/reasoning choices. Enforce:
+
+```text
+child objective         ⊆ checkpoint objective
+child read paths        ⊆ frozen analysis scope
+child candidate writes  ⊆ frozen allowed writes
+child acceptance IDs    ⊆ frozen acceptance
+child capabilities      ⊆ host capability ceiling
+```
+
+Use `root-assign` unless the host exposes a genuine atomic claim operation. Tasks are not participant slots: an identity may execute several ready nodes sequentially. Do not recursively delegate.
+
+New nodes require a DAG revision that names the prior digest and explains the change. If a revision expands objective, allowed writes, acceptance, or a safety boundary, stop for a user-approved checkpoint revision.
+
+For shared work:
 
 1. collect independent positions before revealing peer conclusions;
-2. relay the same complete peer board to participants;
+2. only after Round 1 is sealed, expose the same complete peer board to participants; use peer messaging only when the host reports it, use root relay only when child steering exists, and otherwise downgrade to sealed independent evidence with the reason recorded;
 3. require a challenge or falsification attempt plus the cheapest discriminating check;
 4. adjudicate by evidence, never vote or confidence.
 
-A practical peer board is Agent evidence only. Without an external receipt it does not prove participant identity, read-only behavior, or absence of nested delegation.
+A practical peer board, task DAG, and capability record are Agent evidence only. Without an external receipt they do not prove participant identity, read-only behavior, chronology, workspace isolation, or absence of nested delegation.
+
+For isolated candidates, reject concurrent automatic integration when candidate write paths overlap, one path is an ancestor of another, or file/directory, rename/delete, modify/delete, or binary conflicts are possible. Serialize, select one, or return the node to the main thread. Recheck the candidate base, actual changed paths, diff, and scope before manual integration. Candidate tests are advisory; run every frozen acceptance command again against the integrated canonical state.
 
 ## 4. Implement with Ponytail full
 
@@ -103,7 +135,9 @@ These checks do not cover ignored files, alternate data streams, external link t
 
 Report:
 
-- selected assurance, depth, and coordination;
+- selected assurance, depth, coordination, and derived execution mode;
+- observed host capabilities, final DAG revision, assignments, and every downgrade reason;
+- candidate disposition (`selected`, `rejected`, or `failed`) and integration evidence when candidates were used;
 - actual Agent-created changed paths, separated from pre-existing changes;
 - exact command, exit status, and useful output for each acceptance check;
 - counterevidence sought and unresolved risks;
