@@ -818,7 +818,9 @@ def run_cases() -> list[dict[str, Any]]:
             and "run_eval.py" in legacy_job
             and "run_forward_eval.py" in legacy_job
             and "run_eval.py" not in common_job
-            and "run_forward_eval.py" not in common_job,
+            and "run_forward_eval.py" not in common_job
+            and "Use canonical Windows temp" in common_job
+            and "Use canonical POSIX temp" in common_job,
         )
     return results
 

@@ -89,6 +89,16 @@ jobs:
             $env:GITHUB_ENV,
             "TEMP=$canonicalTemp`nTMP=$canonicalTemp`nTMPDIR=$canonicalTemp`n"
           )
+      - name: Use canonical POSIX temp
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          canonical_temp="$(python -c 'import os,pathlib; print(pathlib.Path(os.environ["RUNNER_TEMP"]).resolve())')"
+          {
+            echo "TEMP=$canonical_temp"
+            echo "TMP=$canonical_temp"
+            echo "TMPDIR=$canonical_temp"
+          } >> "$GITHUB_ENV"
       - run: python -B tests/run_v5_eval.py --threshold 1.0 --json
       - run: python -B tests/run_platform_eval.py --json
       - run: python -B tests/run_distribution_eval.py --threshold 1.0 --json
