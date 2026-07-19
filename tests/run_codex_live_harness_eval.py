@@ -802,6 +802,21 @@ def run_cases() -> list[dict[str, Any]]:
             and external_job.index("uses: actions/setup-python@")
             < external_job.index("secrets.WIDE_LENS_CONTROLLER_ALLOWED_SIGNERS_B64"),
         )
+        legacy_job = ci_workflow.split("legacy-v4:", 1)[1].split(
+            "common-and-native:", 1
+        )[0]
+        common_job = ci_workflow.split("common-and-native:", 1)[1].split(
+            "frozen-benchmark:", 1
+        )[0]
+        record(
+            "platform-specific legacy v4 gates run once on canonical Windows temp",
+            lambda: "runs-on: windows-latest" in legacy_job
+            and "TEMP: ${{ runner.temp }}" in legacy_job
+            and "run_eval.py" in legacy_job
+            and "run_forward_eval.py" in legacy_job
+            and "run_eval.py" not in common_job
+            and "run_forward_eval.py" not in common_job,
+        )
     return results
 
 

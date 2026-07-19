@@ -34,6 +34,26 @@ jobs:
         shell: bash
         run: test "$REF_PROTECTED" = "true"
 
+  legacy-v4:
+    needs: release-context
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      TEMP: ${{ runner.temp }}
+      TMP: ${{ runner.temp }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+      - run: python -B tests/run_eval.py --threshold 1.0 --json
+      - run: python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
+      - run: python -c "import subprocess,sys; value=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'], text=True); print(value, end=''); sys.exit(bool(value))"
+
   common-and-native:
     needs: release-context
     strategy:
@@ -52,8 +72,6 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.10"
-      - run: python -B tests/run_eval.py --threshold 1.0 --json
-      - run: python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
       - run: python -B tests/run_v5_eval.py --threshold 1.0 --json
       - run: python -B tests/run_platform_eval.py --json
       - run: python -B tests/run_distribution_eval.py --threshold 1.0 --json
@@ -161,7 +179,7 @@ jobs:
 
   release-package:
     if: ${{ always() }}
-    needs: [release-context, common-and-native, frozen-benchmark, release-performance, external-live-gate]
+    needs: [release-context, legacy-v4, common-and-native, frozen-benchmark, release-performance, external-live-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -172,12 +190,14 @@ jobs:
         shell: bash
         env:
           CONTEXT_RESULT: ${{ needs.release-context.result }}
+          LEGACY_RESULT: ${{ needs.legacy-v4.result }}
           COMMON_RESULT: ${{ needs.common-and-native.result }}
           BENCHMARK_RESULT: ${{ needs.frozen-benchmark.result }}
           PERFORMANCE_RESULT: ${{ needs.release-performance.result }}
           EXTERNAL_RESULT: ${{ needs.external-live-gate.result }}
         run: |
           test "$CONTEXT_RESULT" = "success"
+          test "$LEGACY_RESULT" = "success"
           test "$COMMON_RESULT" = "success"
           test "$BENCHMARK_RESULT" = "success"
           test "$PERFORMANCE_RESULT" = "success"
