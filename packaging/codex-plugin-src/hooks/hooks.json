@@ -1,0 +1,33 @@
+{
+  "description": "Optional Wide-Lens result-contract guardrails for the neutral peer profile.",
+  "hooks": {
+    "SubagentStart": [
+      {
+        "matcher": "^wide_lens_peer$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/hooks/wide_lens_peer_hook.py\" start",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\hooks\\wide_lens_peer_hook.py\" start",
+            "timeout": 10,
+            "statusMessage": "Loading Wide-Lens peer contract"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "^wide_lens_peer$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/hooks/wide_lens_peer_hook.py\" stop",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\hooks\\wide_lens_peer_hook.py\" stop",
+            "timeout": 10,
+            "statusMessage": "Checking Wide-Lens peer result"
+          }
+        ]
+      }
+    ]
+  }
+}

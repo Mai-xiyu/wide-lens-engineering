@@ -1569,6 +1569,17 @@ def run_workflow_routing_regressions() -> list[dict[str, Any]]:
         f"router_flags={[flag for flag in assured_flags if flag in skill]}",
     )
 
+    record(
+        "Skill activation is explicit and the runtime router stays compact",
+        "Do not invoke implicitly" in skill
+        and "allow_implicit_invocation: false" in openai_yaml
+        and "$wide-lens-engineering" in openai_yaml
+        and len(skill.encode("utf-8")) <= 8_000
+        and "tests/run_" not in skill
+        and "build_codex_plugin.py" not in skill,
+        f"router_bytes={len(skill.encode('utf-8'))}",
+    )
+
     practical_requirements = (
         "git status --porcelain=v2 -z --untracked-files=all",
         "git diff --check",
@@ -1589,7 +1600,8 @@ def run_workflow_routing_regressions() -> list[dict[str, Any]]:
         "runtime participant selection belongs to the active main model",
         ownership in skill
         and "$wide-lens-engineering" in openai_yaml
-        and all(item in openai_yaml for item in ("practical", "assured", "count", "read-only")),
+        and "load only the selected workflow reference" in openai_yaml
+        and "allow_implicit_invocation: false" in openai_yaml,
         "router or UI metadata lost dynamic main-model ownership",
     )
 
@@ -1617,6 +1629,16 @@ def run_readme_regressions() -> list[dict[str, Any]]:
     chinese_path = SKILL_DIR / "README_CN.md"
     english = english_path.read_text(encoding="utf-8")
     chinese = chinese_path.read_text(encoding="utf-8")
+    contributing = (SKILL_DIR / "CONTRIBUTING.md").read_text(encoding="utf-8")
+    manifest = json.loads(
+        (SKILL_DIR / "packaging" / "codex-plugin-src" / ".codex-plugin" / "plugin.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    release_workflow = (SKILL_DIR / ".github" / "workflows" / "release-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    protocol_v5 = (SKILL_DIR / "references" / "protocol-v5.md").read_text(encoding="utf-8")
 
     def record(name: str, passed: bool, detail: str) -> None:
         results.append(
@@ -1657,6 +1679,29 @@ def run_readme_regressions() -> list[dict[str, Any]]:
         and incomplete_installer_request not in english
         and incomplete_installer_request not in chinese,
         "missing explicit repo/path/name or stale bare-URL invocation remains",
+    )
+
+    record(
+        "package SemVer is independent from protocol versions",
+        manifest.get("version") == "0.1.0"
+        and "policy.allow_implicit_invocation: false" in english
+        and "policy.allow_implicit_invocation: false" in chinese
+        and "0.1.0" in english
+        and "0.1.0" in chinese
+        and "packet v5" in english
+        and "packet v5" in chinese
+        and "Plugin/package SemVer" in contributing
+        and "protocol v5" in contributing
+        and "CONTRIBUTING.md" in english
+        and "CONTRIBUTING.md" in chinese
+        and "--version 0.1.0" in release_workflow
+        and "marketplace-0.1.0.zip" in release_workflow
+        and not any(
+            stale in text
+            for stale in ("5.0.0", "v5.0", "v4.1")
+            for text in (english, chinese, contributing, release_workflow, protocol_v5)
+        ),
+        f"manifest_version={manifest.get('version')!r}",
     )
 
     expected_sections = [

@@ -1,0 +1,43 @@
+{
+  "name": "wide-lens-engineering",
+  "version": "0.1.0",
+  "description": "Opt-in practical and externally anchored software delivery with elastic task-DAG coordination.",
+  "author": {
+    "name": "Mai-xiyu",
+    "url": "https://github.com/Mai-xiyu"
+  },
+  "homepage": "https://github.com/Mai-xiyu/wide-lens-engineering",
+  "repository": "https://github.com/Mai-xiyu/wide-lens-engineering",
+  "license": "MIT",
+  "keywords": [
+    "codex-skill",
+    "opt-in-skill",
+    "progressive-disclosure",
+    "software-engineering",
+    "elastic-agent-teams",
+    "task-dag",
+    "isolated-candidates",
+    "capability-leases",
+    "assured-delivery"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Wide-Lens Engineering",
+    "shortDescription": "Opt-in elastic engineering and assured delivery",
+    "longDescription": "Explicitly invoke a practical workflow or externally anchored assured protocol with elastic task-DAG delegation.",
+    "developerName": "Mai-xiyu",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Software engineering",
+      "Elastic subagents",
+      "Assured delivery"
+    ],
+    "websiteURL": "https://github.com/Mai-xiyu/wide-lens-engineering",
+    "defaultPrompt": [
+      "Use $wide-lens-engineering to fix this bug with the smallest verified change.",
+      "Use $wide-lens-engineering with elastic read-only peers where they add evidence.",
+      "Use $wide-lens-engineering to plan an assured delivery for this high-risk change."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

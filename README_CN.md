@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-**面向 Codex 的实用优先软件工程 Skill；只有风险真正需要时，才升级到证据门禁的高保证交付。**
+用弹性多代理团队实现、调试、重构、迁移和审查软件，同时保留唯一 canonical writer 与外部锚定验收。
 
 [![Codex Skill](https://img.shields.io/badge/Codex-Skill-111827)](https://learn.chatgpt.com/docs/customization/overview)
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
@@ -10,81 +10,56 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 <!-- section:overview -->
-Wide-Lens Engineering 是一个可复用的 Codex 工作流，覆盖功能实现、调试、重构、迁移、架构修改和代码审查。它**不是只用于 review 的 Skill**。
+## 这是什么
 
-大多数改动需要严谨工程，而不是最高规格的手续。这个 Skill 让普通任务走快速的 `practical` 路径；只有风险或可信要求足够高时，才升级到外部锚定的 `assured` 协议。
+Wide-Lens Engineering 是用于真实仓库工作的 Codex Skill，不是只做 review 的提示词。它组合了：
 
-| | `practical` | `assured` |
+- 面向普通编码的低开销 `practical` 工作流；
+- 只有其他 Agent 存在正边际收益时才创建的弹性任务 DAG；
+- shared deliberation 的密封首轮与封存后挑战；
+- 宿主实际强制隔离边界时才启用的候选实现；assured 声明还必须有外部 attestation；
+- 面向高风险交付、依赖外部 authority、receipt 与 fail-closed gate 的 `assured` v5 协议。
+
+Skill 不规定 Agent 数量、固定团队、模型或角色阵容。当前主模型根据实际宿主能力与冻结任务派生执行模式，不能根据产品名猜测能力。
+
+安装 Skill **不会**让每个编码会话都自动进入这套流程。Codex metadata 设置了 `policy.allow_implicit_invocation: false`，普通任务继续走宿主默认路径；只有显式调用 `$wide-lens-engineering` 后才加载完整 Skill body，router 随后也只加载选中的 practical 或 assured reference。
+
+| 路径 | 适用场景 | 证据能说明什么 |
 |---|---|---|
-| 适用场景 | 局部、可回滚、范围清晰的工作 | 高风险、有仓库外影响或要求审计的工作 |
-| 证据 | 可见 checkpoint、精确命令、Git 状态和 diff | 冻结合同、确定性 packet、controller 重观察 gate |
-| 成本 | 低手续 | 全仓扫描和外部可信基础设施 |
-| 能诚实声明什么 | 范围内检查与观察到的 diff 一致 | 锚定 packet 与观察到的交付一致 |
+| `practical` | 局部、可回滚、范围清晰的工作 | checkpoint、命令与观察到的 Git diff 一致 |
+| `assured` v5 | 高风险或要求审计的弹性交付 | 外部 controller artifact 与最终状态一致 |
+| legacy `assured` v4 | 已有 v4 集成 | 原 packet v4 行为保持字节兼容 |
 
 <!-- invariant:assured-external-trust-root -->
 > [!IMPORTANT]
-> `assured` 不是 Agent 可以自行授予的标签。缺少真实外部 controller、独立摘要通道、固定 verifier、隔离工件和 OS sandbox 时，Skill 必须报告 assured 前置条件不成立。
+> 缺少真实外部 controller、独立摘要通道、固定 verifier、隔离工件和 OS sandbox 时，Skill 必须报告 assured 前置条件不成立。
 
-[Build Week](#build-week) · [快速开始](#quick-start) · [工作方式](#how-it-works) · [信任边界](#trust-boundaries) · [安装](#installation) · [测试](#testing)
+[快速开始](#quick-start) · [弹性团队](#shared-subagents) · [信任边界](#trust-boundaries) · [安装](#installation) · [测试](#testing)
 
 <!-- section:build-week -->
 <a id="build-week"></a>
-## OpenAI Build Week
+## OpenAI Build Week 来源
 
 - **类别：** Developer Tools
-- **代码仓库：** [github.com/Mai-xiyu/wide-lens-engineering](https://github.com/Mai-xiyu/wide-lens-engineering)
+- **仓库：** [github.com/Mai-xiyu/wide-lens-engineering](https://github.com/Mai-xiyu/wide-lens-engineering)
 - **主要 `/feedback` 会话：** `019f67c4-9bd9-7581-8ae9-3cdd4453d9f7`
-- **演示视频：** 上传草稿经所有者确认后，将在此补充公开 YouTube 链接。
+- **演示：** [Wide-Lens Engineering — GPT-5.6 + Codex](https://youtu.be/rg-BmgUnxL4)
+- **记录的构建模型：** `gpt-5.6-sol`
 
-### 评委 60 秒确定性检查
-
-在仓库根目录使用 Python 3.10 或更高版本运行：
+模型标签和会话 ID 只用于来源说明，不是正确性证明。60 秒 legacy 检查路径：
 
 ```bash
 python -B tests/run_eval.py --threshold 1.0 --json
 python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
 ```
 
-第一条命令检查 planner、路由策略、gate、安全边界和文档合同；第二条以黑盒方式运行命令行入口，并在任何案例跳过时失败。不需要样本数据、API key、账号、第三方 Python 包或网络调用。
-
-要在 Codex 中体验真实 Skill，先按[快速开始](#quick-start)安装，再在一次性仓库中对真实失败测试运行：
-
-```text
-Use $wide-lens-engineering to fix the currently failing test.
-Choose assurance, depth, and coordination independently.
-The active main model owns any subagent count; keep subagents read-only.
-Show the pre-edit checkpoint, smallest causal diff, exact test result, and Git diff.
-```
-
-### 使用 GPT-5.6 与 Codex 构建
-
-上述主要构建会话的本地 Codex session metadata 在核心实现期间持续记录为 `gpt-5.6-sol`。Codex 在该会话内完成了全仓分析、共享 subagent 交叉挑战、协议与 Python 实现、对抗性回归、双语文档以及终端 GitHub 交付。会话 ID 用于评委核验；本 README 不把模型标签本身当成正确性证明。
-
-构建过程中的关键决策：
-
-| 决策 | 原因 | 代价 |
-|---|---|---|
-| 将保证级别、分析深度和协作方式分离 | 风险与信息增益是不同问题 | 主模型必须显式做出三个选择 |
-| 明确区分 `practical` 与 `assured` | 普通编码保持快速，高风险工作可以要求外部锚点 | 完整 assured 交付依赖仓库外基础设施 |
-| subagent 由主模型决定，且只有一个写入者 | 避免固定编排和并发编辑冲突 | 并行 agent 提供证据，不并行写代码 |
-| 因果追踪后再应用 Ponytail 阶梯 | 优先复用与标准库方案 | 最小化不能删除信任边界和回归检查 |
-
-### 运行与平台范围
-
-| 环境 | 当前可声明范围 |
-|---|---|
-| Windows、Git、Python 3.10+ | 已在发布环境验证，包括前向套件 0 跳过 |
-| macOS / Linux | 已实现并记录 POSIX 安装与路径处理；本次 Windows 构建未做发布级实测 |
-| Codex Desktop / CLI | 使用标准 Skill 结构，可全局安装或按仓库安装 |
-| Assured `windows-win32` controller 路径 | 仅限 Windows |
-
-固定测试是协议 oracle，不是通用模型准确率、缺陷召回率或独立安全保证的 benchmark。
+这些确定性测试不需要样本数据、API key、账号、第三方 Python 包或网络调用。
 
 <!-- section:quick-start -->
 <a id="quick-start"></a>
 ## 快速开始
 
-本地使用时，把下面这段请求发给 Codex，让内置安装器显式收到仓库内路径：
+通过 Codex 的 Skill installer 安装仓库根 Skill：
 
 ```text
 Use $skill-installer to install this GitHub skill:
@@ -93,22 +68,16 @@ path: .
 name: wide-lens-engineering
 ```
 
-然后让 Codex 使用它：
+然后显式调用它来编码：
 
 ```text
-Use $wide-lens-engineering to fix this local parser bug.
-Keep the change minimal and verify the real callers.
+Use $wide-lens-engineering to fix the failing parser behavior.
+Choose assurance, depth, and coordination independently.
+Let the active main model decide whether delegation has marginal value.
+Keep the final implementation minimal and run the frozen acceptance checks.
 ```
 
-对于普通低风险修复，预期流程是：
-
-1. 检查仓库规则和已有 Git 状态；
-2. 分别选择保证级别、分析深度和协作方式；
-3. 编辑前公开目标、允许路径和精确检查；
-4. 在最早公共原因处做最小修正；
-5. 运行 checkpoint 中的精确检查，并报告实际 diff 与残余风险。
-
-手动安装和仓库级安装见[安装](#installation)。
+高风险任务应显式请求 assured v5，并提供外部 controller artifact。缺少任一锚点时，Skill 必须拒绝高保证声明。
 
 <!-- section:how-it-works -->
 <a id="how-it-works"></a>
@@ -117,85 +86,81 @@ Keep the change minimal and verify the real callers.
 <!-- invariant:axes-independent -->
 每个任务分别选择一个 intent 和三个互相独立的轴。
 
-### Intent
-
-- `change` —— 实现功能、重构、迁移或修改架构。
-- `debug` —— 复现问题、找到最早公共原因、修复并保留回归证据。
-- `review` —— 只检查和报告，不写入文件。
-
-### 三个独立轴
-
-| 轴 | 选项 | 决定什么 |
+| 维度 | 取值 | 决定什么 |
 |---|---|---|
-| Assurance | `practical` / `assured` | 交付声明如何建立 |
-| Depth | `focused` / `full` | 因果与风险分析需要多宽 |
-| Coordination | `independent` / `shared` | 独立形成证据，还是进行多代理交叉挑战 |
+| Intent | `change`、`debug`、`review` | 主线程获得什么操作权限 |
+| Assurance | `practical`、`assured` | 如何建立完成声明 |
+| Depth | `focused`、`full` | 因果与风险分析的宽度 |
+| Coordination | `independent`、`shared` | 独立形成证据，还是由 peer 交叉挑战 |
 
-`full` 不自动等于 `assured`，`assured` 也不自动要求 `shared`。Agent 数量不决定其中任何一个轴。
+`full` 不自动等于 `assured`，`assured` 也不自动要求 `shared`。Agent 数量不决定任何公共轴。
 
-典型路由：
+执行模式由运行时派生，不是第四个用户必选轴：
 
-| 任务 | 常见选择 |
-|---|---|
-| 有直接测试的小型局部缺陷 | `practical / focused / independent` |
-| 可回滚的跨模块重构 | `practical / full`，coordination 由主模型决定 |
-| 授权迁移或凭据处理 | `assured / full` |
-| 只读代码审查 | `review` intent；禁止写入 |
+```text
+main-only
+read-only-proposals
+isolated-candidates
+```
+
+主模型先记录宿主实际提供的 spawn、join、steering、peer-message、atomic-claim、只读、workspace 隔离、canonical write blocking、独立 verifier、per-spawn model 与 depth-control 能力。未知能力为 `false`。随后构造无环任务 DAG；子任务目标、路径、验收 ID 和能力只能收窄冻结父合同。
 
 ```mermaid
 flowchart LR
-    A["映射真实任务"] --> B["选择 assurance"]
-    A --> C["选择 depth"]
-    A --> D["选择 coordination"]
-    B --> E["冻结范围与检查"]
-    C --> F["追踪原因、消费者和风险"]
-    D --> G["独立或共享证据"]
-    E --> H["最小实现"]
-    F --> H
-    G --> H
-    H --> I["重新观察测试和 diff"]
+    A["只读映射"] --> B["冻结范围与验收"]
+    B --> C["观察宿主能力"]
+    C --> D["派生执行模式"]
+    D --> E["构造动态任务 DAG"]
+    E --> F["密封证据或隔离候选"]
+    F --> G["主集成者选择并写入"]
+    G --> H["独立 verifier 检查最终状态"]
 ```
+
+Ponytail 同时约束委派与实现：预期信息增益不足就不建团队；实现达到验收后立即停止增加复杂度。
 
 <!-- section:practical -->
 <a id="practical-workflow"></a>
-## Practical 工作流
+## Practical Elastic
 
-只有工作局部、可回滚、范围清晰，并且不涉及安全、凭据、隐私、持久化数据、并发、公共 API、部署、基础设施、仓库外副作用或其他不可逆边界时，才能使用 `practical`。
+Practical checkpoint 写明目标、非目标、允许路径、精确验收命令、宿主能力、任务 DAG、execution mode 与降级原因。
 
-流程有意保持简短：
+| 观察到的宿主支持 | 派生行为 |
+|---|---|
+| 不值得委派，或无有效能力 | `main-only` |
+| 能强制只读，但没有隔离 workspace | Peer 返回证据或 patch 文本，由主线程应用 |
+| 具备真实 workspace 隔离与 canonical write block | Candidate worker 只能修改隔离副本 |
+| 没有 peer-message，但可以 steer child | Root 在密封后转发一份完整 peer board |
+| peer-message 与 child steering 都没有 | 降级为密封的 independent evidence，并记录原因 |
+| 没有 atomic task claim | Root 分配 ready DAG node |
 
-1. 记录初始 Git 状态并保留无关用户改动；
-2. 发布用户可见 checkpoint，写清目标、非目标、允许路径和精确验收命令；
-3. 追踪真实入口、公共修正点、消费者、失败路径和最小反例；
-4. 通过 Ponytail 最小化阶梯实现；
-5. 将最终 staged、unstaged 和 untracked 状态与 checkpoint 对比。
+Git worktree 可以减少 practical 文件冲突，但 linked worktree 共享 Git common metadata，不能作为 assured sandbox。Candidate 自测只是建议；冻结验收必须在集成后的 canonical state 上重跑。候选写入重叠时只能串行、择一或退回主线程，禁止 last-writer-wins。
 
-Practical 证据是有价值的工程证据，但不是 attestation。它不能认证执行者、证明时序、约束进程，也不能观察全部仓库外副作用。
-
-阅读规范性的 [practical 工作流](references/practical.md)。
+规范见 [references/practical.md](references/practical.md)。
 
 <!-- section:assured -->
 <a id="assured-workflow"></a>
-## Assured 工作流
+## Assured Elastic（protocol v5）
 
-涉及安全或授权、密钥与凭据、隐私或合规、schema/数据迁移、删除与恢复、并发、分布式一致性、公共 API、部署、基础设施、仓库外副作用、不可逆操作、实质性 checkpoint 修订，或用户明确要求审计/attestation 时，Skill 必须升级到 `assured`。
+Assured v5 保留完整 authority contract v1 与 baseline manifest v2，并在首次 spawn 之前绑定编排：
 
-Assured 交付保持现有 protocol v4 wire 格式：
+1. packet v5 嵌入完整冻结合同与精确 orchestration policy；
+2. `orchestration-envelope/v1` 绑定 controller、capability、DAG、resource、sandbox 与 lineage digest；
+3. controller 原子 lease 限制每个 actor；
+4. candidate bundle 是来自隔离 workspace 的 inert blob；
+5. main integrator 是 canonical checkout 唯一写入者；
+6. `execution-receipt/v2` 记录 actor、lease、event、candidate、integration、state、diff 与 resource use；
+7. 身份不相交的 verifier 在 fresh context 中生成 `verification-receipt/v1`；
+8. gate 在执行任何冻结命令前检查 schema、digest、path、actor、lease、report 与 state，执行后再次哈希。
 
-- 外部 baseline manifest v2；
-- authority 完整的冻结合同；
-- 确定性 packet v4 和独立发布的摘要；
-- 固定 verifier 与隔离工件；
-- controller 观察的验收命令和最终仓库状态；
-- coordination 为 `shared` 时强制要求 runtime receipt。
+缺少 controller、独立摘要、隔离 workspace、完整事件捕获、独立 verifier 或 OS sandbox 时必须失败，不能静默降级后继续声明 `assured`。
 
-Agent 编写的 report 只是证据。它不能在结束阶段新增验收标准、扩大写入范围或反过来成为任务权威。
+protocol v5 的任务图修订只能发生在 dispatch 之前：修订必须保留 `version`、`packet_sha256`、`mode`、`execution`、`dispatch`、`communication`、所有先前任务与 assignment，只能追加新节点。Controller 必须 attest `predecessor_execution_started=false`。任何 actor 一旦 spawn，就应开启新的 assured execution epoch，不得在同一 receipt 中混用两个 envelope authority。
 
-阅读规范性的 [assured protocol v4](references/protocol.md)。
+阅读 [references/protocol-v5.md](references/protocol-v5.md)。冻结 legacy 格式见 [references/protocol.md](references/protocol.md)；v5 artifact 与参数对 v4 CLI 必须非法。
 
 <!-- section:shared-subagents -->
 <a id="shared-subagents"></a>
-## 自适应共享 Subagents
+## 弹性多代理团队
 
 <!-- invariant:main-model-selects-subagents -->
 是否需要 subagent，以及采用哪些身份、数量和 lane assignments，**只由当前主模型**决定。
@@ -203,143 +168,137 @@ Agent 编写的 report 只是证据。它不能在结束阶段新增验收标准
 <!-- invariant:no-fixed-participant-count -->
 Skill 不包含精确、默认或最大参与者数量。
 
-Shared coordination 遵循四条规则：
+Task 不等于 Agent：同一 Agent 可以顺序执行多个 ready DAG node，任务也可以留在主线程。首版禁止递归委派；所有 child 都由主模型直接管理。
 
-1. 每个 subagent 在看到其他结论前先形成密封立场；
-2. 所有参与者收到同一份 peer board；
-3. 第二轮必须挑战、证伪或实质检验其他立场；
-4. 主线程依据判别性证据裁决，不投票、不比较信心值。
+`shared` coordination 的 Round 1 必须密封。只有封存后，controller 才能公开完整 peer board 或允许 peer messaging。Peer message 只是未可信证据，不是 authority；裁决依靠判别性检查，而不是投票或置信度。protocol v5 中，存在依赖关系的 shared task 使用 `root-relay`；`peer-message` 只用于无依赖 round，因为每个发送者在交流结束前必须持续持有有效 lease。
 
 <!-- invariant:subagents-read-only -->
 <!-- invariant:no-recursive-delegation -->
 <!-- invariant:main-thread-only-writer -->
-Subagent 保持只读，禁止递归委派，主线程是唯一写入者和集成者。Practical 模式下讨论记录只是 Agent evidence；assured 模式下必须有真实 controller receipt。
+在 legacy v4 与 `read-only-proposals` 中：Subagent 保持只读，禁止递归委派，主线程是唯一写入者和集成者。
+
+在 `isolated-candidates` 中，analysis worker 仍然只读。Candidate worker 只能写宿主提供的隔离 workspace；该 workspace 不得挂载目标仓库、共享 `.git`、artifact store、凭据或 verifier 输入。Assured v5 还要求 controller lease 与对该隔离的外部 attestation。Main integrator 仍是 canonical checkout 唯一写入者。
 
 <!-- section:ponytail -->
 <a id="ponytail"></a>
-## 从设计上保持最小
+## 从结构上保持最小
 
-理解完整因果面后，实现停在第一个能工作的 Ponytail 层级：
+定位最早公共原因后，在第一个充分的 rung 停止：
 
 ```text
 not-needed → reuse → stdlib → native → existing-dependency → minimal-custom
 ```
 
-这条阶梯拒绝推测性抽象、依赖、配置和脚手架，但不会删掉信任边界验证、数据丢失保护、必要错误路径、可访问性、明确验收标准或最小有用回归。
+最小化会删除推测性抽象、依赖和无收益团队活动，但不会删除信任检查、必要失败路径、数据损失保护、可访问性或最小有效回归测试。
 
 <!-- section:examples -->
 <a id="examples"></a>
-## 提示词示例
-
-### 功能或缺陷修复
+## 请求示例
 
 ```text
-Use $wide-lens-engineering to implement this feature.
-Choose assurance, depth, and coordination independently.
-Keep subagents read-only and make the smallest verified change.
+Use $wide-lens-engineering to implement this cross-module feature.
+Use practical/full unless a hard assured boundary is discovered.
+Derive the team and task DAG from actual capabilities; do not prescribe a count.
 ```
 
-### 高保证改动
-
 ```text
-Use $wide-lens-engineering in assured mode for this authorization migration.
-Do not proceed unless the controller, digest anchors, pinned verifier,
-artifact isolation, and OS sandbox are real.
+Use $wide-lens-engineering in assured v5 for this authorization migration.
+Fail closed unless the controller, sandbox, leases, receipts, and independent verifier are real.
 ```
 
-### 让主模型决定是否协作
-
 ```text
-Use $wide-lens-engineering for this cross-module refactor.
-The active main model must decide whether shared subagents add information,
-including their identities, count, and lane assignments.
+Use $wide-lens-engineering to debug this race.
+Require sealed independent hypotheses, a discriminating reproduction, and one canonical writer.
 ```
 
 <!-- section:trust-boundaries -->
 <a id="trust-boundaries"></a>
 ## 信任边界
 
-| 能力 | `practical` | 有真实外部基础设施的 `assured` |
+| 声明 | Practical 证据 | Assured v5 证明 |
 |---|---:|---:|
-| 可见的目标、范围与验收 checkpoint | 是 | 是，冻结进 packet |
-| 精确命令与实际 Git diff | Agent 观察 | Controller 重新观察 |
-| 阻止 report 新增验收命令 | 流程规则 | Gate 强制 |
-| 独立 packet/verifier/receipt digest | 否 | 是 |
-| 认证 authority 或 controller 身份 | 否 | 仅在外部认证/签名存在时 |
-| 限制网络、凭据、仓库外写入和子进程 | 否 | 需要 OS sandbox |
-| 保证真实世界正确率或缺陷召回 | 否 | 否 |
+| 已公开范围与验收 | 是 | 外部冻结并绑定 digest |
+| 已观察最终命令与 diff | 当前会话观察 | controller 与独立 verifier receipt |
+| Child 无法写 canonical state | 只有宿主实际强制时成立 | 必须有隔离 workspace 与 canonical write block |
+| Actor 身份与时序已认证 | 否 | 只有外部设施认证或签名时成立 |
+| 网络、凭据、子进程与仓库外写入被限制 | 否 | 依赖已证明的 OS sandbox |
+| 软件普遍正确 | 否 | 否 |
 
-哈希本身只证明内容一致性，不证明身份、时序或独立性。同一个未受信会话打印的摘要不是外部可信锚点。
+Hash 只能证明内容一致，不能自行证明身份、时间、独立性或 confinement。Hook 检查消息形状，不是安全边界。Gate 不执行或自动应用 candidate bundle。
 
-### Git worktree 与链接
+Assured v5 会拒绝整个 canonical repository（包括 Git metadata）和 candidate workspace 中的 hard-linked file。无法稳定提供文件身份与 link count 的文件系统属于显式 fail-closed 兼容边界。
 
-Practical 模式可以在 Git worktree 中工作，但外置 Git 元数据不属于它的保证范围。没有明确授权和合适的可信根模型时，不得通过 symlink、junction、reparse point 或 linked parent 写入。
-
-Assured protocol v4 对外置 `.git` gitfile、symlink、junction 和 reparse point 采取 fail closed。
+v5 checker 是外部 artifact 的参考 gate。本仓库不提供 controller、lease service、隔离 workspace runtime、签名服务或 OS sandbox。
 
 <!-- section:installation -->
 <a id="installation"></a>
 ## 安装
 
-### 要求
+要求：Codex、Git、Python 3.10+；无第三方 Python runtime 依赖。正式 controller 签名验证还会使用 OpenSSH `ssh-keygen`。
 
-- Codex
-- Git
-- Python 3.10 或更高版本
-- 无第三方 Python 运行时依赖
+### 1. 只安装 Skill
 
-### 使用 Skill 安装器进行本地安装
+使用[快速开始](#quick-start)中的 installer 请求，或将仓库 clone 到 Codex 识别的 Skills 目录。仓库根目录是唯一 canonical Skill，不存在嵌套重复的 `SKILL.md`。Router 保持精简，practical、assured 与 legacy 细节分别位于独立 reference 中，只在选中时加载。
 
-```text
-Use $skill-installer to install this GitHub skill:
-repo: Mai-xiyu/wide-lens-engineering
-path: .
-name: wide-lens-engineering
-```
+### 2. Codex 项目适配器
 
-这里的 `path: .` 不能省略，因为 Skill 位于仓库根目录；只有仓库 URL 并不是完整的安装器来源。
-
-本仓库是 Skill 源码，并不是已打包的 Codex plugin。OpenAI 将 Skill 定位为工作流的编写格式，将 plugin 定位为供其他用户或工作区安装的分发单元。面向 marketplace 或团队分发时，应再封装为 plugin。
-
-### 手动全局安装
-
-当前 Codex 文档将全局 Skill 放在 `$HOME/.agents/skills`。
-
-macOS / Linux：
+先预览，再安装中性只读 peer profile：
 
 ```bash
-mkdir -p "$HOME/.agents/skills"
-git clone https://github.com/Mai-xiyu/wide-lens-engineering.git \
-  "$HOME/.agents/skills/wide-lens-engineering"
+python scripts/install_codex_adapter.py --target /path/to/project
+python scripts/install_codex_adapter.py --target /path/to/project --apply
 ```
 
-PowerShell：
+适配器只写 `.codex/config.toml` 的 `agents.max_depth = 1` 与 `.codex/agents/wide-lens-peer.toml`。它不配置 `max_threads`、model、reasoning、nickname、MCP、固定角色或参与者数量。不同的 config 永不覆盖；`--force` 只作用于不同的 peer profile。详见 [references/hosts/codex.md](references/hosts/codex.md)。
 
-```powershell
-$target = Join-Path $HOME '.agents\skills\wide-lens-engineering'
-New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
-git clone https://github.com/Mai-xiyu/wide-lens-engineering.git $target
+### 3. Codex Plugin artifact
+
+从 canonical 根 Skill 构建确定性 archive：
+
+```bash
+python scripts/build_codex_plugin.py --version 0.1.0 --output-dir dist \
+  --validator scripts/validate_codex_plugin.py --force
+python scripts/validate_codex_plugin.py \
+  dist/wide-lens-engineering-marketplace-0.1.0.zip \
+  --expected-version 0.1.0
 ```
 
-如果只想在一个仓库中使用，把 Skill 文件夹放到目标仓库的 `.agents/skills/wide-lens-engineering`。
+发布验证器按版本固定完整 Plugin manifest、hook 注册、hook 实现和每个运行时文件。它可以脱离本源码 checkout 独立复制运行；未知发布版本会 fail closed。
 
-可以用 `$wide-lens-engineering` 显式调用，也可以让 Codex 在任务与 Skill description 匹配时自动选择。
+解压 archive，然后注册其自包含的本地 marketplace：
+
+```bash
+codex plugin marketplace add /absolute/path/to/unpacked-marketplace
+codex plugin marketplace list
+```
+
+重启 ChatGPT desktop，并从 Plugins 中安装 `wide-lens-engineering`。Plugin 分发最小 runtime Skill 与可选的 `SubagentStart`/`SubagentStop` result-contract hook，且有意不包含仓库测试与打包工具。它不会自动注册 `.codex/agents`，因此项目适配器需单独安装。
+
+安装或启用 Plugin 不代表其 hook 已受信。应先使用 `/hooks` 检查来源、命令与摘要，再显式信任；正常安装不应使用 `--dangerously-bypass-hook-trust`。`SubagentStart` 注入输出合同，`SubagentStop` 校验结果形状并可要求重试一次。两者都不能证明只读执行、身份、时序或 workspace 隔离；没有项目适配器时，其 `wide_lens_peer` matcher 不会运行。
+
+生成的 archive 位于被忽略的 `dist/`，因此打包不会制造第二套维护源码。
+
+### 版本规则
+
+首个公开预览包目标是 `0.1.0`。Package SemVer 与 wire schema 相互独立：packet v5 仍是协议 `version: 5`，冻结兼容路径仍是 packet v4。确定性、跨平台、性能与可复现打包门禁通过后，可以发布明确标记为未获 attestation 的 `0.x` GitHub Prerelease；外部 controller receipt 限制的是 assured 声明，而不是普通预览包的可用性。公共安装与工作流合同稳定后再使用 `1.0.0`；不能为了匹配 package 而改名 protocol v5。
 
 <!-- section:testing -->
 <a id="testing"></a>
 ## 测试
 
-在 Skill 根目录运行发布测试：
+完整维护者测试矩阵、可复现打包命令与发布规则位于运行时 Skill 之外的 [CONTRIBUTING.md](CONTRIBUTING.md)。快速本地检查为：
 
 ```bash
 python -B tests/run_eval.py --threshold 1.0 --json
 python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
-git diff --check
+python -B scripts/validate_skill.py .
 ```
 
-第一套测试覆盖确定性 planner、gate、安全、路由策略和文档合同；第二套将协议 CLI 当作黑盒，并要求跳过数为零。
+150-task suite 在 `authority-packet-lineage`、`capabilities-dag-envelope`、`resources-sandbox-events`、`candidate-isolation-conflict`、`verifier-report-gate` 和 `compatibility-path-artifact` 各冻结 25 个语义唯一任务。30 个正向完整链和 120 个负向/故障链都在 fresh Python process 中运行完整 CLI gate，并绑定随机 challenge、验收 marker 与仓库状态。150/150 的单侧 95% 精确二项下界约为 98.02%。
 
-固定测试集 100% 通过，只能证明所有已声明 oracle 通过；它不代表通用模型路由准确率、真实项目缺陷召回率或独立安全审计。
+该统计只适用于冻结协议/controller benchmark 与固定配置，不是通用模型准确率、真实编码任务成功率、缺陷召回率或独立安全审计。固定同仓测试仍然只是证据，不是外部 assurance。
+
+独立的 live runner 见 [benchmarks/codex-live-v1](benchmarks/codex-live-v1/README.md)。Local 模式会启动真实、fresh 的 Codex 进程并检查功能性变更，但始终返回 `release_eligible=false`。External 模式要求 controller 签署绑定当前 commit 的 anchor，并在 `local`、`security`、`concurrency`、`data`、`api`、`distributed` 六层完成 150/150 个 live coding task；runner 只报告 receipt 是否有效，不能自行批准 Release。只有受保护的 `assured-v5-release` environment 可以授权该 receipt。本仓库不分发隐藏 suite、controller key 或受保护的 release challenge，因此不得用协议 benchmark 替代该门禁。
 
 <!-- section:repository-map -->
 <a id="repository-map"></a>
@@ -347,37 +306,37 @@ git diff --check
 
 ```text
 wide-lens-engineering/
-├── LICENSE                  # MIT 许可证
-├── SKILL.md                 # Router and shared engineering rules
-├── README.md                # English documentation
-├── README_CN.md             # 简体中文文档
-├── agents/openai.yaml       # Codex UI metadata
+├── SKILL.md                         # canonical router 与工程工作流
+├── README.md / README_CN.md         # 面向读者的双语文档
+├── CONTRIBUTING.md                  # 维护者测试、版本与发布规则
+├── .github/workflows/               # CI、预览打包与 assured 发布门禁
+├── .codex/                          # 可选项目适配器
+├── agents/openai.yaml               # Codex Skill UI metadata
 ├── references/
-│   ├── practical.md         # Low-overhead workflow
-│   ├── protocol.md          # Assured protocol v4
-│   └── lenses.json          # Analysis lens catalog
-├── scripts/                 # Deterministic packet and gate tools
-└── tests/                   # Deterministic and black-box release suites
+│   ├── practical.md                 # Practical Elastic
+│   ├── protocol.md                  # 冻结 assured v4
+│   ├── protocol-v5.md               # Assured Elastic v5
+│   ├── hosts/codex.md               # 已验证 Codex 映射
+│   └── lenses.json                  # 冻结分析 catalog
+├── packaging/codex-plugin-src/      # Plugin-only manifest 与 hook
+├── benchmarks/codex-live-v1/        # 外部 live-coding 门禁合同
+├── scripts/                         # v4 冻结工具、v5 工具、installer/builder
+└── tests/                           # 确定性、分发、统计与性能门禁
 ```
 
-仓库根目录就是 Skill 根，不存在多余的同名嵌套目录。
+`scripts/diverge.py`、`scripts/check_delivery.py`、`references/lenses.json`、两个 golden packet v4 digest 与 legacy CLI 行为保持冻结。
 
 <!-- section:references -->
 <a id="references"></a>
-## 文档参考
+## 参考与关键词
 
-README 的信息结构借鉴了 [OpenAI Plugins examples](https://github.com/openai/plugins)、[Anthropic Skills](https://github.com/anthropics/skills)、[Agent Skills specification](https://github.com/agentskills/agentskills)、[Superpowers](https://github.com/obra/superpowers) 和 [Vercel Skills](https://github.com/vercel-labs/skills) 中适合本项目的模式。
+- [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+- [Codex hooks](https://learn.chatgpt.com/docs/hooks)
+- [Build Codex plugins](https://learn.chatgpt.com/docs/build-plugins)
+- [Git worktree](https://git-scm.com/docs/git-worktree)
+- [NIST proportion intervals](https://www.itl.nist.gov/div898/handbook/prc/section2/prc241.htm)
+- [Anthropic agent teams](https://code.claude.com/docs/en/agent-teams)
+- [GitHub deployment environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)
+- [OpenSSH signed-data verification](https://man.openbsd.org/ssh-keygen)
 
-技术设计参考：
-
-- [OpenAI Build skills](https://learn.chatgpt.com/docs/build-skills) —— Skill 编写、渐进披露与 plugin 分发。
-- [OpenAI Codex customization](https://learn.chatgpt.com/docs/customization/overview) —— Skills、渐进披露与 subagents。
-- [SLSA attestation model](https://slsa.dev/spec/v1.2/attestation-model) 与 [in-toto](https://in-toto.io/) —— 外部 subject、digest 和签名证明。
-- [Microsoft file-stream and path APIs](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/) —— Windows 路径、stream 与 alias 边界。
-
-<details>
-<summary>搜索关键词</summary>
-
-Codex Skill, OpenAI Codex, coding agent, practical coding workflow, assured software delivery, feature implementation, debugging, root-cause analysis, bug fixing, refactoring, migration, architecture, code review, multi-agent systems, shared subagents, adaptive agent orchestration, immutable contract, external trust anchor, controller receipt, evidence-gated delivery, adversarial testing, divergent thinking, Git diff verification, Git worktree, Ponytail, YAGNI, minimal implementation.
-
-</details>
+搜索关键词：Codex Skill、elastic agent teams、adaptive multi-agent coding、dynamic task DAG、isolated candidates、capability negotiation、capability leases、single canonical writer、independent verifier、assured software delivery、zero-trust agent protocol、sealed deliberation、adversarial debugging、root-cause analysis、code generation、refactoring、migration、Ponytail、YAGNI。

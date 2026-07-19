@@ -1,0 +1,252 @@
+name: assured-release-candidate-gates
+
+on:
+  workflow_dispatch:
+    inputs:
+      live_suite_url:
+        description: HTTPS URL for the frozen post-run live suite manifest
+        required: true
+        type: string
+      live_results_url:
+        description: HTTPS URL for the external controller result set
+        required: true
+        type: string
+      live_anchor_url:
+        description: HTTPS URL for the controller-signed canonical anchor
+        required: true
+        type: string
+      live_signature_url:
+        description: HTTPS URL for the detached SSHSIG over the canonical anchor
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release-context:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      REF_PROTECTED: ${{ github.ref_protected }}
+    steps:
+      - name: Require a protected release ref
+        shell: bash
+        run: test "$REF_PROTECTED" = "true"
+
+  legacy-v4:
+    needs: release-context
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+      - name: Use canonical Windows temp
+        shell: pwsh
+        run: |
+          $canonicalTemp = Join-Path $env:LOCALAPPDATA "Temp"
+          [System.IO.Directory]::CreateDirectory($canonicalTemp) | Out-Null
+          [System.IO.File]::AppendAllText(
+            $env:GITHUB_ENV,
+            "TEMP=$canonicalTemp`nTMP=$canonicalTemp`nTMPDIR=$canonicalTemp`n"
+          )
+      - run: python -B tests/run_eval.py --threshold 1.0 --json
+      - run: python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
+      - run: python -c "import subprocess,sys; value=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'], text=True); print(value, end=''); sys.exit(bool(value))"
+
+  common-and-native:
+    needs: release-context
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+      - name: Use canonical Windows temp
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $canonicalTemp = Join-Path $env:LOCALAPPDATA "Temp"
+          [System.IO.Directory]::CreateDirectory($canonicalTemp) | Out-Null
+          [System.IO.File]::AppendAllText(
+            $env:GITHUB_ENV,
+            "TEMP=$canonicalTemp`nTMP=$canonicalTemp`nTMPDIR=$canonicalTemp`n"
+          )
+      - name: Use canonical POSIX temp
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          canonical_temp="$(python -c 'import os,pathlib; print(pathlib.Path(os.environ["RUNNER_TEMP"]).resolve())')"
+          {
+            echo "TEMP=$canonical_temp"
+            echo "TMP=$canonical_temp"
+            echo "TMPDIR=$canonical_temp"
+          } >> "$GITHUB_ENV"
+      - run: python -B tests/run_v5_eval.py --threshold 1.0 --json
+      - run: python -B tests/run_platform_eval.py --json
+      - run: python -B tests/run_distribution_eval.py --threshold 1.0 --json
+      - run: python -B tests/run_codex_live_harness_eval.py --threshold 1.0 --json
+      - run: python -c "import subprocess,sys; value=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'], text=True); print(value, end=''); sys.exit(bool(value))"
+
+  frozen-benchmark:
+    needs: release-context
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+      - run: python -B tests/run_stat_eval.py --require-all --json
+      - run: python -c "import subprocess,sys; value=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'], text=True); print(value, end=''); sys.exit(bool(value))"
+
+  release-performance:
+    needs: release-context
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+      - name: Paired release performance gate
+        run: python -B tests/run_perf_eval.py --json
+
+  external-live-gate:
+    needs: release-context
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: assured-v5-release
+    env:
+      LIVE_SUITE_URL: ${{ inputs.live_suite_url }}
+      LIVE_RESULTS_URL: ${{ inputs.live_results_url }}
+      LIVE_ANCHOR_URL: ${{ inputs.live_anchor_url }}
+      LIVE_SIGNATURE_URL: ${{ inputs.live_signature_url }}
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+      - name: Fetch externally controlled live artifacts
+        shell: bash
+        env:
+          LIVE_CONTROLLER_ALLOWED_SIGNERS_B64: ${{ secrets.WIDE_LENS_CONTROLLER_ALLOWED_SIGNERS_B64 }}
+          LIVE_CONTROLLER_CHALLENGE_SHA256: ${{ secrets.WIDE_LENS_CONTROLLER_CHALLENGE_SHA256 }}
+        run: |
+          case "$LIVE_SUITE_URL" in https://*) ;; *) exit 1 ;; esac
+          case "$LIVE_RESULTS_URL" in https://*) ;; *) exit 1 ;; esac
+          case "$LIVE_ANCHOR_URL" in https://*) ;; *) exit 1 ;; esac
+          case "$LIVE_SIGNATURE_URL" in https://*) ;; *) exit 1 ;; esac
+          [[ "$LIVE_CONTROLLER_CHALLENGE_SHA256" =~ ^[0-9a-f]{64}$ ]] || exit 1
+          test -n "$LIVE_CONTROLLER_ALLOWED_SIGNERS_B64"
+          command -v ssh-keygen
+          printf '%s' "$LIVE_CONTROLLER_ALLOWED_SIGNERS_B64" | base64 --decode > "$RUNNER_TEMP/controller.allowed_signers"
+          chmod 600 "$RUNNER_TEMP/controller.allowed_signers"
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location --output live-suite.json "$LIVE_SUITE_URL"
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location --output live-results.json "$LIVE_RESULTS_URL"
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location --output live-anchor.json "$LIVE_ANCHOR_URL"
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location --output live-anchor.sig "$LIVE_SIGNATURE_URL"
+      - name: Validate signed 150-task controller receipt
+        env:
+          LIVE_CONTROLLER_CHALLENGE_SHA256: ${{ secrets.WIDE_LENS_CONTROLLER_CHALLENGE_SHA256 }}
+        run: >-
+          python -B tests/run_codex_live_eval.py
+          --suite live-suite.json
+          --provider external-results
+          --skill-root .
+          --external-results live-results.json
+          --external-anchor live-anchor.json
+          --controller-signature live-anchor.sig
+          --controller-allowed-signers "$RUNNER_TEMP/controller.allowed_signers"
+          --expected-repository "$GITHUB_REPOSITORY"
+          --expected-release-commit "$GITHUB_SHA"
+          --expect-controller-challenge-sha256 "$LIVE_CONTROLLER_CHALLENGE_SHA256"
+          --results validated-live-receipt.json
+      - name: Authorize the validated receipt through this protected environment
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          receipt = json.loads(Path("validated-live-receipt.json").read_text(encoding="utf-8"))
+          if receipt.get("passed") is not True or receipt.get("external_receipt_valid") is not True:
+              raise SystemExit("the signed controller receipt is not valid")
+          if "release_eligible" in receipt:
+              raise SystemExit("the receipt validator must not self-authorize a release")
+          print("protected environment authorized the signed controller receipt")
+          PY
+
+  release-package:
+    if: ${{ always() }}
+    needs: [release-context, legacy-v4, common-and-native, frozen-benchmark, release-performance, external-live-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Require every release gate to succeed
+        shell: bash
+        env:
+          CONTEXT_RESULT: ${{ needs.release-context.result }}
+          LEGACY_RESULT: ${{ needs.legacy-v4.result }}
+          COMMON_RESULT: ${{ needs.common-and-native.result }}
+          BENCHMARK_RESULT: ${{ needs.frozen-benchmark.result }}
+          PERFORMANCE_RESULT: ${{ needs.release-performance.result }}
+          EXTERNAL_RESULT: ${{ needs.external-live-gate.result }}
+        run: |
+          test "$CONTEXT_RESULT" = "success"
+          test "$LEGACY_RESULT" = "success"
+          test "$COMMON_RESULT" = "success"
+          test "$BENCHMARK_RESULT" = "success"
+          test "$PERFORMANCE_RESULT" = "success"
+          test "$EXTERNAL_RESULT" = "success"
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+      - name: Build deterministic marketplace archive
+        run: >-
+          python -B scripts/build_codex_plugin.py
+          --version 0.1.0
+          --output-dir dist
+          --validator scripts/validate_codex_plugin.py
+          --force
+      - name: Validate release archive
+        run: >-
+          python -B scripts/validate_codex_plugin.py
+          dist/wide-lens-engineering-marketplace-0.1.0.zip
+          --expected-version 0.1.0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wide-lens-engineering-marketplace-0.1.0
+          path: dist/wide-lens-engineering-marketplace-0.1.0.zip
+          if-no-files-found: error

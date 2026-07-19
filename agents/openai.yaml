@@ -1,4 +1,6 @@
 interface:
   display_name: "Wide-Lens Engineering"
-  short_description: "Practical-first coding with optional assured delivery"
-  default_prompt: "Use $wide-lens-engineering to select assurance, depth, and coordination separately; default to practical focused work only for isolated low-risk changes, escalate to assured when trust or blast radius requires it, let the active main model choose shared-subagent identities, count, and lanes, keep subagents read-only, and keep the main thread as the only writer."
+  short_description: "Opt-in elastic coding and assured delivery"
+  default_prompt: "Use $wide-lens-engineering for this task. Select practical or assured after inspecting risk, load only the selected workflow reference, let the active main model decide whether and how to delegate, keep one canonical writer, and verify the final integrated state."
+policy:
+  allow_implicit_invocation: false
