@@ -811,9 +811,10 @@ def run_cases() -> list[dict[str, Any]]:
         record(
             "platform-specific legacy v4 gates run once on canonical Windows temp",
             lambda: "runs-on: windows-latest" in legacy_job
-            and "Use canonical runner temp" in legacy_job
-            and "$env:RUNNER_TEMP" in legacy_job
+            and "Use canonical Windows temp" in legacy_job
+            and "$env:LOCALAPPDATA" in legacy_job
             and "$env:GITHUB_ENV" in legacy_job
+            and "TMPDIR=$canonicalTemp" in legacy_job
             and "run_eval.py" in legacy_job
             and "run_forward_eval.py" in legacy_job
             and "run_eval.py" not in common_job

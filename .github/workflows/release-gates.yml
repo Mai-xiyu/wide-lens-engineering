@@ -48,12 +48,14 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.10"
-      - name: Use canonical runner temp
+      - name: Use canonical Windows temp
         shell: pwsh
         run: |
+          $canonicalTemp = Join-Path $env:LOCALAPPDATA "Temp"
+          [System.IO.Directory]::CreateDirectory($canonicalTemp) | Out-Null
           [System.IO.File]::AppendAllText(
             $env:GITHUB_ENV,
-            "TEMP=$env:RUNNER_TEMP`nTMP=$env:RUNNER_TEMP`n"
+            "TEMP=$canonicalTemp`nTMP=$canonicalTemp`nTMPDIR=$canonicalTemp`n"
           )
       - run: python -B tests/run_eval.py --threshold 1.0 --json
       - run: python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
@@ -77,6 +79,16 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.10"
+      - name: Use canonical Windows temp
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $canonicalTemp = Join-Path $env:LOCALAPPDATA "Temp"
+          [System.IO.Directory]::CreateDirectory($canonicalTemp) | Out-Null
+          [System.IO.File]::AppendAllText(
+            $env:GITHUB_ENV,
+            "TEMP=$canonicalTemp`nTMP=$canonicalTemp`nTMPDIR=$canonicalTemp`n"
+          )
       - run: python -B tests/run_v5_eval.py --threshold 1.0 --json
       - run: python -B tests/run_platform_eval.py --json
       - run: python -B tests/run_distribution_eval.py --threshold 1.0 --json

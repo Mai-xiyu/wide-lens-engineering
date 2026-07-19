@@ -1366,7 +1366,7 @@ def run_cases() -> list[dict[str, Any]]:
         frozen_hashes = {
             "scripts/diverge.py": "b34d33923f6750dd5e41bcb27da830956506ad962562b4cdf281e146571a8f47",
             "scripts/check_delivery.py": "ecd2a3754bf93371351d8c436e8c670d022210bc48ae9d644f05ebd35d784a2d",
-            "references/lenses.json": "10668c9e1154a54ee753865a456b50fa92d79d24a7139e621ce6afe5f7aacb33",
+            "references/lenses.json": "19b776e9d74c35dd6b5004aa0447db840b0c4c2f1aafa3b4fd1c38f4a8f58518",
         }
         for relative, expected_digest in frozen_hashes.items():
             observed = hashlib.sha256(SKILL_DIR.joinpath(relative).read_bytes()).hexdigest()
@@ -3230,7 +3230,9 @@ def run_cases() -> list[dict[str, Any]]:
         )
 
         def isolated_errors(
-            execution: dict[str, Any], plan: dict[str, Any] | None = None
+            execution: dict[str, Any],
+            plan: dict[str, Any] | None = None,
+            baseline_manifest: dict[str, Any] | None = None,
         ) -> list[str]:
             errors, _ = validate_execution_receipt(
                 execution,
@@ -3240,7 +3242,11 @@ def run_cases() -> list[dict[str, Any]]:
                 resource_envelope=isolated.resources,
                 envelope_sha256=_json_digest(isolated.envelope),
                 repository=isolated.repo,
-                baseline_manifest=isolated.baseline,
+                baseline_manifest=(
+                    isolated.baseline
+                    if baseline_manifest is None
+                    else baseline_manifest
+                ),
                 pre_acceptance_manifest=build_state_manifest(isolated.repo),
                 protected_paths=(
                     path
@@ -3251,6 +3257,35 @@ def run_cases() -> list[dict[str, Any]]:
             return errors
 
         record("isolated execution receipt validates", not isolated_errors(isolated.execution))
+        stale_identity_baseline = clone(isolated.baseline)
+        bundle_stat = isolated.paths["candidate_bundle"].stat(
+            follow_symlinks=False
+        )
+        stale_identity_baseline["entries"]["src/example.py"]["file_id"] = (
+            f"{bundle_stat.st_dev}:{bundle_stat.st_ino}"
+        )
+        stale_identity_execution = clone(isolated.execution)
+        stale_baseline_digest = state_manifest_sha256(stale_identity_baseline)
+        stale_identity_execution["candidates"][0]["base_state_sha256"] = (
+            stale_baseline_digest
+        )
+        canonical = stale_identity_execution["canonical_pre_acceptance"]
+        canonical["baseline_state_sha256"] = stale_baseline_digest
+        canonical["diff_sha256"] = _diff_digest(
+            canonical["repository_ref"],
+            stale_baseline_digest,
+            canonical["final_state_sha256"],
+            canonical["changed_paths"],
+        )
+        stale_identity_errors = isolated_errors(
+            stale_identity_execution,
+            baseline_manifest=stale_identity_baseline,
+        )
+        record(
+            "stale baseline file IDs cannot impersonate live hard links after inode reuse",
+            not stale_identity_errors,
+            str(stale_identity_errors)[:500],
+        )
         missing_candidate = clone(isolated.execution)
         missing_candidate["candidates"] = []
         missing_candidate["integrations"] = []

@@ -423,16 +423,6 @@ def _repository_file_objects(
     return identities, sorted(errors)
 
 
-def _manifest_file_objects(manifest: dict[str, Any]) -> set[str]:
-    """Retain trustworthy historical IDs where the platform supplied them."""
-
-    return {
-        metadata["file_id"]
-        for metadata in manifest.get("entries", {}).values()
-        if isinstance(metadata, dict) and metadata.get("type") == "file"
-    }
-
-
 def _path_identity(value: Any) -> str | None:
     if not _nonempty(value):
         return None
@@ -1025,9 +1015,11 @@ def validate_execution_receipt(
         live_repository_objects, repository_object_errors = _repository_file_objects(
             repository, pre_acceptance_manifest
         )
-        repository_objects = (
-            _manifest_file_objects(baseline_manifest) | live_repository_objects
-        )
+        # Historical baseline IDs are not live aliases. A deleted baseline file's
+        # inode may be reused by a later, independent artifact on Unix, so using
+        # those stale IDs here creates a false hard-link finding. Isolation is
+        # enforced against the freshly observed canonical pre-acceptance state.
+        repository_objects = live_repository_objects
         errors.extend(repository_object_errors)
     except GateError as exc:
         errors.append(str(exc))

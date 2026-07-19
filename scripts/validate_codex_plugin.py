@@ -36,11 +36,11 @@ RUNTIME_SHA256 = {
     "references/practical.md": "56caa2513aca4148b5864cbef6cb028d01d1f14ff9196367f5ca9c801f2e2d44",
     "references/protocol.md": "775ad630a92b91009506314fc63747c4b1d9395e746f0a102ad41b4934edf639",
     "references/protocol-v5.md": "a8bf68d2d3e95900a4910610a29c50b510153645afd9d8ac21ebcf8e85b07e8a",
-    "references/lenses.json": "10668c9e1154a54ee753865a456b50fa92d79d24a7139e621ce6afe5f7aacb33",
+    "references/lenses.json": "19b776e9d74c35dd6b5004aa0447db840b0c4c2f1aafa3b4fd1c38f4a8f58518",
     "scripts/diverge.py": "b34d33923f6750dd5e41bcb27da830956506ad962562b4cdf281e146571a8f47",
     "scripts/diverge_v5.py": "cd342f7259671c471ede89db30b95be7aabfd9b0ca6577c32477a55d6715457b",
     "scripts/check_delivery.py": "ecd2a3754bf93371351d8c436e8c670d022210bc48ae9d644f05ebd35d784a2d",
-    "scripts/check_delivery_v5.py": "ba383440bd5619374db52a5753126b492e2893a7ed53e1f72fcfa4889497d108",
+    "scripts/check_delivery_v5.py": "3e7ac2dae87da9dc5580a82d3fbd1ac6fc1dc86310a7cbbacc581cb4bf32a02b",
 }
 PEER_HOOK_SHA256 = "28db7623d7d39d8d31f76aa145ec5e09f65373470b8fb9db70e0b53596c88427"
 CONTROL_SHA256 = {
