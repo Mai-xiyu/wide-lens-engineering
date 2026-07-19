@@ -280,7 +280,7 @@ codex plugin marketplace list
 
 ### 版本规则
 
-首个公开预览包目标是 `0.1.0`。Package SemVer 与 wire schema 相互独立：packet v5 仍是协议 `version: 5`，冻结兼容路径仍是 packet v4。只有公共安装/工作流合同稳定且外部授权的 live release gate 通过后才使用 `1.0.0`；不能为了匹配 package 而改名 protocol v5。
+首个公开预览包目标是 `0.1.0`。Package SemVer 与 wire schema 相互独立：packet v5 仍是协议 `version: 5`，冻结兼容路径仍是 packet v4。确定性、跨平台、性能与可复现打包门禁通过后，可以发布明确标记为未获 attestation 的 `0.x` GitHub Prerelease；外部 controller receipt 限制的是 assured 声明，而不是普通预览包的可用性。公共安装与工作流合同稳定后再使用 `1.0.0`；不能为了匹配 package 而改名 protocol v5。
 
 <!-- section:testing -->
 <a id="testing"></a>
@@ -309,6 +309,7 @@ wide-lens-engineering/
 ├── SKILL.md                         # canonical router 与工程工作流
 ├── README.md / README_CN.md         # 面向读者的双语文档
 ├── CONTRIBUTING.md                  # 维护者测试、版本与发布规则
+├── .github/workflows/               # CI、预览打包与 assured 发布门禁
 ├── .codex/                          # 可选项目适配器
 ├── agents/openai.yaml               # Codex Skill UI metadata
 ├── references/

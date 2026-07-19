@@ -3,6 +3,7 @@ name: release-gates
 on:
   push:
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read

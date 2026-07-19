@@ -53,12 +53,27 @@ Build the archive twice and require identical bytes and SHA-256. Update the vali
 
 ## Release policy
 
-A passing same-repository suite is necessary but cannot authorize a formal assured release. Do not create a tag or GitHub Release unless all of these hold:
+Package publication and assured attestation are separate decisions.
 
-1. every deterministic, forward, platform, distribution, statistical, and performance gate passes;
-2. 150/150 externally controlled fresh-context live coding tasks pass for the release commit;
-3. the controller-signed anchor validates against the protected challenge and allowed signers;
-4. the protected `assured-v5-release` GitHub environment authorizes the receipt;
-5. the release ref is protected and the final checkout is clean.
+### Preview package release
 
-Until those conditions exist, publish only a branch or draft pull request and describe `0.1.0` as an unreleased preview target.
+A `0.x` GitHub Prerelease may be published without an assured claim when all of these hold:
+
+1. deterministic, forward, v5, distribution, platform, harness, statistical, and performance gates pass;
+2. Windows, Ubuntu, and macOS applicability jobs have no applicable skips or failures;
+3. the Plugin archive validates independently and rebuilds byte-for-byte;
+4. the preview workflow runs on `main`, records the exact commit and SHA-256, and leaves the checkout clean;
+5. release notes label the artifact `preview-unattested` and make no model-accuracy or assured-delivery claim.
+
+Run `.github/workflows/preview-release.yml` on `main`, download and revalidate its artifact, then create the matching `v<package-version>` GitHub Prerelease at that exact commit. Upload the ZIP, `.sha256`, and `release-provenance.json`.
+
+### Assured release attestation
+
+An artifact may additionally be described as externally attested only when all preview requirements hold and:
+
+1. 150/150 externally controlled fresh-context live coding tasks pass for the release commit;
+2. the controller-signed anchor validates against the protected challenge and allowed signers;
+3. the protected `assured-v5-release` GitHub environment authorizes the receipt;
+4. the release ref is protected and the final checkout is clean.
+
+The assured workflow remains fail-closed. Missing external infrastructure never blocks an explicitly unattested preview package, but it always blocks an assured claim.

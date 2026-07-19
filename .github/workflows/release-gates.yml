@@ -1,4 +1,4 @@
-name: release-candidate-gates
+name: assured-release-candidate-gates
 
 on:
   workflow_dispatch:

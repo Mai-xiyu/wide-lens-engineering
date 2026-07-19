@@ -764,6 +764,9 @@ def run_cases() -> list[dict[str, Any]]:
         release_workflow = (
             SKILL_DIR / ".github" / "workflows" / "release-gates.yml"
         ).read_text(encoding="utf-8")
+        preview_workflow = (
+            SKILL_DIR / ".github" / "workflows" / "preview-release.yml"
+        ).read_text(encoding="utf-8")
         record(
             "release workflow has no green opt-out and uses a protected trust root",
             lambda: "release_candidate" not in release_workflow
@@ -778,18 +781,39 @@ def run_cases() -> list[dict[str, Any]]:
             and "if: ${{ always() }}" in release_workflow
             and "receipt validator must not self-authorize" in release_workflow,
         )
+        record(
+            "preview workflow packages unattested artifacts without weakening assured gates",
+            lambda: "workflow_dispatch:" in preview_workflow
+            and "uses: ./.github/workflows/ci.yml" in preview_workflow
+            and "run_perf_eval.py --json" in preview_workflow
+            and 'test "$REF" = "refs/heads/main"' in preview_workflow
+            and "REF_NAME" not in preview_workflow
+            and '--version "$PLUGIN_VERSION"' in preview_workflow
+            and 'test "$first_sha256" = "$second_sha256"' in preview_workflow
+            and "--expected-version \"$PLUGIN_VERSION\"" in preview_workflow
+            and '(cd dist && sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256")'
+            in preview_workflow
+            and '"assurance": "preview-unattested"' in preview_workflow
+            and '"workflow_run_id"' in preview_workflow
+            and "actions/upload-artifact@" in preview_workflow
+            and "release-provenance.json" in preview_workflow
+            and "assured-v5-release" not in preview_workflow
+            and "WIDE_LENS_CONTROLLER" not in preview_workflow
+            and "gh release" not in preview_workflow,
+        )
         ci_workflow = (SKILL_DIR / ".github" / "workflows" / "ci.yml").read_text(
             encoding="utf-8"
         )
         action_refs = re.findall(
             r"uses:\s+actions/[^@\s]+@([^\s#]+)",
-            release_workflow + "\n" + ci_workflow,
+            release_workflow + "\n" + preview_workflow + "\n" + ci_workflow,
         )
         record(
             "workflow actions are pinned and checkout cleanliness includes untracked files",
             lambda: bool(action_refs)
             and all(re.fullmatch(r"[0-9a-f]{40}", value) for value in action_refs)
             and "--untracked-files=all" in release_workflow
+            and "--untracked-files=all" in preview_workflow
             and "--untracked-files=all" in ci_workflow,
         )
         external_job = release_workflow.split("external-live-gate:", 1)[1].split(

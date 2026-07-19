@@ -1,0 +1,107 @@
+name: preview-release-package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PLUGIN_VERSION: "0.1.0"
+
+jobs:
+  gates:
+    uses: ./.github/workflows/ci.yml
+
+  release-performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+      - name: Paired preview performance gate
+        run: python -B tests/run_perf_eval.py --json
+      - name: Performance gate leaves the checkout clean
+        run: python -c "import subprocess,sys; value=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'], text=True); print(value, end=''); sys.exit(bool(value))"
+
+  preview-package:
+    if: ${{ always() }}
+    needs: [gates, release-performance]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      GATES_RESULT: ${{ needs.gates.result }}
+      PERFORMANCE_RESULT: ${{ needs.release-performance.result }}
+    steps:
+      - name: Require successful preview gates on main
+        shell: bash
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          test "$GATES_RESULT" = "success"
+          test "$PERFORMANCE_RESULT" = "success"
+          test "$REF" = "refs/heads/main"
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
+      - name: Build deterministic preview archive
+        shell: bash
+        run: |
+          archive="dist/wide-lens-engineering-marketplace-${PLUGIN_VERSION}.zip"
+          python -B scripts/build_codex_plugin.py --version "$PLUGIN_VERSION" --output-dir dist --validator scripts/validate_codex_plugin.py --force
+          first_sha256="$(sha256sum "$archive" | cut -d ' ' -f 1)"
+          python -B scripts/build_codex_plugin.py --version "$PLUGIN_VERSION" --output-dir dist --validator scripts/validate_codex_plugin.py --force
+          second_sha256="$(sha256sum "$archive" | cut -d ' ' -f 1)"
+          test "$first_sha256" = "$second_sha256"
+      - name: Validate and describe preview archive
+        shell: bash
+        run: |
+          archive="dist/wide-lens-engineering-marketplace-${PLUGIN_VERSION}.zip"
+          python -B scripts/validate_codex_plugin.py "$archive" --expected-version "$PLUGIN_VERSION"
+          (cd dist && sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256")
+          ARCHIVE="$archive" python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          archive = Path(os.environ["ARCHIVE"])
+          payload = {
+              "version": 1,
+              "package_version": os.environ["PLUGIN_VERSION"],
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "commit": os.environ["GITHUB_SHA"],
+              "ref": os.environ["GITHUB_REF"],
+              "workflow_run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "assurance": "preview-unattested",
+              "archive": archive.name,
+              "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+          }
+          Path("dist/release-provenance.json").write_text(
+              json.dumps(payload, sort_keys=True, indent=2) + "\n",
+              encoding="utf-8",
+              newline="\n",
+          )
+          PY
+      - name: Package step leaves the checkout clean
+        run: python -c "import subprocess,sys; value=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'], text=True); print(value, end=''); sys.exit(bool(value))"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wide-lens-engineering-marketplace-0.1.0
+          path: |
+            dist/wide-lens-engineering-marketplace-0.1.0.zip
+            dist/wide-lens-engineering-marketplace-0.1.0.zip.sha256
+            dist/release-provenance.json
+          if-no-files-found: error

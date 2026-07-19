@@ -280,7 +280,7 @@ Generated archives live in ignored `dist/`, so packaging never creates a second 
 
 ### Versioning
 
-The first public-preview package target is `0.1.0`. Package SemVer is independent of wire schemas: packet v5 remains protocol `version: 5`, and the frozen compatibility path remains packet v4. Use `1.0.0` only after the public installation/workflow contract is stable and the externally authorized live release gate has passed; do not rename protocol v5 to match the package.
+The first public-preview package target is `0.1.0`. Package SemVer is independent of wire schemas: packet v5 remains protocol `version: 5`, and the frozen compatibility path remains packet v4. A `0.x` GitHub Prerelease may be published after deterministic, cross-platform, performance, and reproducible-package gates pass, provided it is explicitly labeled unattested. External controller receipts gate an assured claim, not ordinary preview package availability. Use `1.0.0` when the public installation and workflow contract is stable; do not rename protocol v5 to match the package.
 
 <!-- section:testing -->
 <a id="testing"></a>
@@ -316,6 +316,7 @@ wide-lens-engineering/
 ├── SKILL.md                         # canonical router and engineering workflow
 ├── README.md / README_CN.md         # reader documentation
 ├── CONTRIBUTING.md                  # maintainer tests, versions, and release policy
+├── .github/workflows/               # CI, preview packaging, assured release gates
 ├── .codex/                          # optional project adapter
 ├── agents/openai.yaml               # Codex Skill UI metadata
 ├── references/
