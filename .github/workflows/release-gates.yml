@@ -41,8 +41,6 @@ jobs:
     env:
       PYTHONUTF8: "1"
       PYTHONDONTWRITEBYTECODE: "1"
-      TEMP: ${{ runner.temp }}
-      TMP: ${{ runner.temp }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -50,6 +48,13 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.10"
+      - name: Use canonical runner temp
+        shell: pwsh
+        run: |
+          [System.IO.File]::AppendAllText(
+            $env:GITHUB_ENV,
+            "TEMP=$env:RUNNER_TEMP`nTMP=$env:RUNNER_TEMP`n"
+          )
       - run: python -B tests/run_eval.py --threshold 1.0 --json
       - run: python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
       - run: python -c "import subprocess,sys; value=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'], text=True); print(value, end=''); sys.exit(bool(value))"
