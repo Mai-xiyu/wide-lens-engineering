@@ -1655,7 +1655,10 @@ def run_readme_regressions() -> list[dict[str, Any]]:
     record(
         "English README is primary and language links are reciprocal",
         english.startswith("# Wide-Lens Engineering")
-        and "[简体中文](README_CN.md)" in english_head
+        and any(
+            link in english_head
+            for link in ("[中文](README_CN.md)", "[简体中文](README_CN.md)")
+        )
         and "[English](README.md)" in chinese_head
         and "## Quick start" in english
         and "## 快速开始" in chinese,
