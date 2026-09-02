@@ -100,6 +100,7 @@ jobs:
             echo "TMPDIR=$canonical_temp"
           } >> "$GITHUB_ENV"
       - run: python -B tests/run_v5_eval.py --threshold 1.0 --json
+      - run: python -B tests/run_failure_cards_eval.py --threshold 1.0 --json
       - run: python -B tests/run_platform_eval.py --json
       - run: python -B tests/run_distribution_eval.py --threshold 1.0 --json
       - run: python -B tests/run_codex_live_harness_eval.py --threshold 1.0 --json
@@ -236,17 +237,17 @@ jobs:
       - name: Build deterministic marketplace archive
         run: >-
           python -B scripts/build_codex_plugin.py
-          --version 0.1.0
+          --version 0.2.0
           --output-dir dist
           --validator scripts/validate_codex_plugin.py
           --force
       - name: Validate release archive
         run: >-
           python -B scripts/validate_codex_plugin.py
-          dist/wide-lens-engineering-marketplace-0.1.0.zip
-          --expected-version 0.1.0
+          dist/wide-lens-engineering-marketplace-0.2.0.zip
+          --expected-version 0.2.0
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: wide-lens-engineering-marketplace-0.1.0
-          path: dist/wide-lens-engineering-marketplace-0.1.0.zip
+          name: wide-lens-engineering-marketplace-0.2.0
+          path: dist/wide-lens-engineering-marketplace-0.2.0.zip
           if-no-files-found: error

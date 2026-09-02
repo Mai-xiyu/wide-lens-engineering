@@ -1683,7 +1683,7 @@ def run_readme_regressions() -> list[dict[str, Any]]:
 
     record(
         "package SemVer is independent from protocol versions",
-        manifest.get("version") == "0.1.0"
+        manifest.get("version") == "0.2.0"
         and "policy.allow_implicit_invocation: false" in english
         and "policy.allow_implicit_invocation: false" in chinese
         and "0.1.0" in english
@@ -1694,8 +1694,8 @@ def run_readme_regressions() -> list[dict[str, Any]]:
         and "protocol v5" in contributing
         and "CONTRIBUTING.md" in english
         and "CONTRIBUTING.md" in chinese
-        and "--version 0.1.0" in release_workflow
-        and "marketplace-0.1.0.zip" in release_workflow
+        and "--version 0.2.0" in release_workflow
+        and "marketplace-0.2.0.zip" in release_workflow
         and not any(
             stale in text
             for stale in ("5.0.0", "v5.0", "v4.1")
@@ -1709,6 +1709,7 @@ def run_readme_regressions() -> list[dict[str, Any]]:
         "build-week",
         "quick-start",
         "how-it-works",
+        "current-failure-controls",
         "practical",
         "assured",
         "shared-subagents",

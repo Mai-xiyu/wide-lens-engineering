@@ -7,7 +7,7 @@ description: "Opt-in engineering workflow for explicit Wide-Lens requests: pract
 
 Use this Skill only after the user explicitly invokes `$wide-lens-engineering` or explicitly asks for the Wide-Lens workflow. The Codex metadata disables implicit invocation. If this Skill is selected accidentally, return to the host's ordinary workflow without loading any reference.
 
-This file is a router, not the complete protocol. Load exactly one current workflow reference after choosing the route. Keep legacy v4 material unloaded unless an existing v4 artifact must be reproduced or verified.
+This file is a router, not the complete protocol. Load exactly one current workflow reference after choosing the route. Keep legacy v4 material unloaded unless an existing v4 artifact must be reproduced or verified. Reactive failure cards are an exception only after their runtime signal is observed; never preload them.
 
 ## Select intent and independent axes
 
@@ -57,6 +57,17 @@ Select `shared` only when sealed independent positions followed by peer challeng
 
 The selected reference owns detailed capability negotiation, task-DAG rules, candidate isolation, receipts, validation, and reporting. Do not duplicate those details here.
 
+## Load a reactive failure card only on evidence
+
+Do not load the dated research report or any failure card during ordinary execution. After the selected workflow is active, load one matching card only when its failure signal is observed:
+
+- requested product is displaced by meta-work, authority reverses, correction does not propagate, or completion is premature: [references/failures/goal-drift.md](references/failures/goal-drift.md);
+- compaction/truncation, wrong or ambiguous tool routing, uncertain side effects, missing completion events, or blind retry: [references/failures/context-and-tools.md](references/failures/context-and-tools.md);
+- delegation routing/topology differs from the plan, work repeats, or resources grow without proportional progress: [references/failures/delegation-and-cost.md](references/failures/delegation-and-cost.md);
+- behavior depends on OS/client/Git topology/sandbox/model route or current post-cutoff facts: [references/failures/platform-and-freshness.md](references/failures/platform-and-freshness.md).
+
+Start with the earliest causal failure. Load another card only if a distinct observed failure remains. A card may narrow or stop execution, but it cannot add authority, expand the frozen scope, change acceptance, or upgrade assurance.
+
 ## Preserve these invariants
 
 1. Read applicable repository policy and preserve pre-existing work.
@@ -67,6 +78,8 @@ The selected reference owns detailed capability negotiation, task-DAG rules, can
 6. A practical checkpoint is procedural evidence, not an attestation. Assured claims require the external controller, independent digest channel, pinned verifier, artifact isolation, and OS sandbox described by protocol v5.
 7. For debugging, fix the earliest shared cause rather than patching visible callers one by one.
 8. Verify the final integrated state with the frozen acceptance checks and inspect the actual diff before claiming completion.
+9. Agent-created plans, tests, hashes, reports, checkers, gates, and policy files are supporting artifacts, not authority or the requested product. They cannot revise scope, acceptance, cleanup ownership, or completion.
+10. Narrative intent is not a tool result. Bind follow-up operations to the exact returned handle, inspect possible side effects before retrying, and stop an identical repeated path until a discriminating diagnostic exists.
 
 Apply the embedded Ponytail convergence rule after understanding the causal surface:
 

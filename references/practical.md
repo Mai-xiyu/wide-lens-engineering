@@ -35,9 +35,11 @@ depth: focused | full
 coordination: independent | shared
 execution: main-only | read-only-proposals | isolated-candidates
 objective: ...
+deliverable: exact observable product outcome, distinct from supporting process artifacts
 non-goals: ...
 allowed paths: ...
 exact acceptance commands: ...
+supporting artifacts: none | exact justified list; never authority or completion
 assumptions: ...
 pre-existing dirty paths: ...
 host capabilities: {all eleven known boolean values}
@@ -47,7 +49,9 @@ communication: root-relay | peer-message | none
 downgrade reason: ... | none
 ```
 
-The checkpoint is procedural, not externally authenticated. If objective, non-goals, allowed paths, acceptance, or a safety boundary must change, publish the proposed revision and obtain user approval before continuing. Never rewrite it only in the final report.
+The checkpoint is procedural, not externally authenticated. If objective, deliverable, non-goals, allowed paths, acceptance, or a safety boundary must change, publish the proposed revision and obtain user approval before continuing. Never rewrite it only in the final report.
+
+Plans, tests, reports, hashes, checkers, gates, task graphs, and generated policy are supporting artifacts. Agent-created support has no authority to revise the checkpoint, become a cleanup exception, or substitute for the deliverable. Default to no new governance artifact; create one only when a frozen acceptance item cannot be observed proportionally without it.
 
 For `review`, allow no writes. For `debug`, include the reproduction command in exact acceptance.
 
@@ -100,6 +104,10 @@ A practical peer board, task DAG, and capability record are Agent evidence only.
 
 For isolated candidates, reject concurrent automatic integration when candidate write paths overlap, one path is an ancestor of another, or file/directory, rename/delete, modify/delete, or binary conflicts are possible. Serialize, select one, or return the node to the main thread. Recheck the candidate base, actual changed paths, diff, and scope before manual integration. Candidate tests are advisory; run every frozen acceptance command again against the integrated canonical state.
 
+If delegation exhibits a routing anomaly, unexpected topology, repeated non-discriminating work, or disproportionate resource growth, load `failures/delegation-and-cost.md`. Do not load it for a normal delegation path.
+
+If a tool call, compaction, platform boundary, or goal-preservation failure becomes observable, load only the matching reactive card linked by `SKILL.md`. Confirm actual runtime events and repository state before retrying or continuing; a narrated intention or planned DAG is not execution evidence.
+
 ## 4. Implement with Ponytail full
 
 After understanding the causal surface, stop at the first working rung:
@@ -117,7 +125,7 @@ Do not write through a symlink, junction, reparse point, or linked parent withou
 
 ## 5. Verify actual effects
 
-Run only the exact acceptance commands from the checkpoint. Then inspect both unstaged and staged results:
+Demonstrate the checkpoint deliverable in the actual integrated state, then run only the exact acceptance commands from the checkpoint. Supporting artifacts and command success do not compensate for an absent product. Inspect both unstaged and staged results:
 
 ```bash
 git diff --check
@@ -140,6 +148,7 @@ Report:
 - candidate disposition (`selected`, `rejected`, or `failed`) and integration evidence when candidates were used;
 - actual Agent-created changed paths, separated from pre-existing changes;
 - exact command, exit status, and useful output for each acceptance check;
+- direct evidence that the deliverable exists, before supporting process evidence;
 - counterevidence sought and unresolved risks;
 - shared disagreements and evidence-based resolution when applicable.
 

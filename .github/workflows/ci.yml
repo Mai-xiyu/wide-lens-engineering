@@ -77,6 +77,8 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Assured v5 deterministic gate
         run: python -B tests/run_v5_eval.py --threshold 1.0 --json
+      - name: Reactive reliability-card gate
+        run: python -B tests/run_failure_cards_eval.py --threshold 1.0 --json
       - name: Common and native applicability manifest
         run: python -B tests/run_platform_eval.py --json
       - name: Distribution and adapter gate

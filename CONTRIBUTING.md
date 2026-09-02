@@ -16,6 +16,7 @@ Never derive a package version from a protocol version. A future `1.0.0` package
 
 - `SKILL.md` is the small opt-in router.
 - `references/practical.md` and `references/protocol-v5.md` hold the selected runtime workflow.
+- `references/failures/` contains short reactive cards; `research/` contains dated evidence and is never packaged.
 - `references/protocol.md`, `scripts/diverge.py`, `scripts/check_delivery.py`, `references/lenses.json`, and the v4 golden digests are frozen compatibility surfaces.
 - `README.md` and `README_CN.md` are reader documentation.
 - This file owns maintainer-only validation and release instructions.
@@ -29,6 +30,7 @@ Run every deterministic gate before proposing a package:
 ```bash
 python -B tests/run_eval.py --threshold 1.0 --json
 python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
+python -B tests/run_failure_cards_eval.py --threshold 1.0 --json
 python -B tests/run_v5_eval.py --threshold 1.0 --json
 python -B tests/run_distribution_eval.py --threshold 1.0 --json
 python -B tests/run_platform_eval.py --json
@@ -42,11 +44,11 @@ git diff --check
 Build and independently validate the current preview archive:
 
 ```bash
-python -B scripts/build_codex_plugin.py --version 0.1.0 --output-dir dist \
+python -B scripts/build_codex_plugin.py --version 0.2.0 --output-dir dist \
   --validator scripts/validate_codex_plugin.py --force
 python -B scripts/validate_codex_plugin.py \
-  dist/wide-lens-engineering-marketplace-0.1.0.zip \
-  --expected-version 0.1.0
+  dist/wide-lens-engineering-marketplace-0.2.0.zip \
+  --expected-version 0.2.0
 ```
 
 Build the archive twice and require identical bytes and SHA-256. Update the validator's version-keyed control hashes only after the canonical runtime and Plugin control files are final, then rerun the full distribution suite.
