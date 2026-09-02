@@ -1,6 +1,6 @@
 # Wide-Lens Engineering
 
-**English** | [简体中文](README_CN.md)
+**English** | [中文](README_CN.md)
 
 Build, debug, refactor, migrate, and review software with an elastic agent team—without giving up a single canonical writer or externally anchored acceptance.
 
