@@ -1,7 +1,7 @@
 {
   "name": "wide-lens-engineering",
-  "version": "0.1.0",
-  "description": "Opt-in practical and externally anchored software delivery with elastic task-DAG coordination.",
+  "version": "0.2.0",
+  "description": "Opt-in reliable engineering with reactive failure controls, elastic task-DAG coordination, and externally anchored delivery.",
   "author": {
     "name": "Mai-xiyu",
     "url": "https://github.com/Mai-xiyu"
@@ -14,6 +14,10 @@
     "opt-in-skill",
     "progressive-disclosure",
     "software-engineering",
+    "agent-reliability",
+    "goal-preservation",
+    "context-recovery",
+    "tool-call-verification",
     "elastic-agent-teams",
     "task-dag",
     "isolated-candidates",
@@ -23,12 +27,13 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Wide-Lens Engineering",
-    "shortDescription": "Opt-in elastic engineering and assured delivery",
-    "longDescription": "Explicitly invoke a practical workflow or externally anchored assured protocol with elastic task-DAG delegation.",
+    "shortDescription": "Opt-in reliable engineering and assured delivery",
+    "longDescription": "Explicitly invoke practical or externally anchored engineering with reactive failure controls and elastic task-DAG delegation.",
     "developerName": "Mai-xiyu",
     "category": "Developer Tools",
     "capabilities": [
       "Software engineering",
+      "Agent reliability",
       "Elastic subagents",
       "Assured delivery"
     ],

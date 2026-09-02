@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 env:
-  PLUGIN_VERSION: "0.1.0"
+  PLUGIN_VERSION: "0.2.0"
 
 jobs:
   gates:
@@ -99,9 +99,9 @@ jobs:
         run: python -c "import subprocess,sys; value=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'], text=True); print(value, end=''); sys.exit(bool(value))"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: wide-lens-engineering-marketplace-0.1.0
+          name: wide-lens-engineering-marketplace-0.2.0
           path: |
-            dist/wide-lens-engineering-marketplace-0.1.0.zip
-            dist/wide-lens-engineering-marketplace-0.1.0.zip.sha256
+            dist/wide-lens-engineering-marketplace-0.2.0.zip
+            dist/wide-lens-engineering-marketplace-0.2.0.zip.sha256
             dist/release-provenance.json
           if-no-files-found: error

@@ -25,8 +25,8 @@ PORTABLE_PLUGIN_VALIDATOR = SKILL_DIR / "scripts" / "validate_codex_plugin.py"
 PORTABLE_SKILL_VALIDATOR = SKILL_DIR / "scripts" / "validate_skill.py"
 HOOK = SKILL_DIR / "packaging" / "codex-plugin-src" / "hooks" / "wide_lens_peer_hook.py"
 PLUGIN_PREFIX = "plugins/wide-lens-engineering"
-PLUGIN_VERSION = "0.1.0"
-DRIFT_VERSION = "0.1.1"
+PLUGIN_VERSION = "0.2.0"
+DRIFT_VERSION = "0.2.1"
 sys.path.insert(0, str(SKILL_DIR / "scripts"))
 
 from validate_codex_plugin import (  # noqa: E402
@@ -458,6 +458,10 @@ def run_cases() -> list[dict[str, Any]]:
                 and "CONTRIBUTING.md" not in runtime_names,
             )
             expected_keywords = {
+                "agent-reliability",
+                "goal-preservation",
+                "context-recovery",
+                "tool-call-verification",
                 "elastic-agent-teams",
                 "task-dag",
                 "isolated-candidates",
@@ -466,7 +470,7 @@ def run_cases() -> list[dict[str, Any]]:
                 "progressive-disclosure",
             }
             record(
-                "plugin discovery keywords cover elastic delivery",
+                "plugin discovery keywords cover reliability and elastic delivery",
                 expected_keywords <= set(manifest.get("keywords", [])),
             )
             portable_archive = command(

@@ -1,6 +1,6 @@
 interface:
   display_name: "Wide-Lens Engineering"
-  short_description: "Opt-in elastic coding and assured delivery"
-  default_prompt: "Use $wide-lens-engineering for this task. Select practical or assured after inspecting risk, load only the selected workflow reference, let the active main model decide whether and how to delegate, keep one canonical writer, and verify the final integrated state."
+  short_description: "Opt-in reliable coding and assured delivery"
+  default_prompt: "Use $wide-lens-engineering for this task. Select practical or assured after inspecting risk, load only the selected workflow reference, load a failure card only after its signal appears, let the active main model decide whether and how to delegate, keep one canonical writer, and verify the requested product in the final integrated state."
 policy:
   allow_implicit_invocation: false

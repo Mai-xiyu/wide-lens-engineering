@@ -21,6 +21,10 @@ RUNTIME_FILES = {
     "LICENSE",
     "agents/openai.yaml",
     "references/practical.md",
+    "references/failures/goal-drift.md",
+    "references/failures/context-and-tools.md",
+    "references/failures/delegation-and-cost.md",
+    "references/failures/platform-and-freshness.md",
     "references/protocol.md",
     "references/protocol-v5.md",
     "references/lenses.json",
@@ -30,12 +34,16 @@ RUNTIME_FILES = {
     "scripts/check_delivery_v5.py",
 }
 RUNTIME_SHA256 = {
-    "SKILL.md": "86331b74ff21c43ab48a1d3810e5f2ad28187bfd60672370f52caaeff7229dd8",
+    "SKILL.md": "c05629fe3f41e4f0fd73dfd96608d0864ed475cdccd210fd5f04d9826524fbad",
     "LICENSE": "6bb2dd9d8f7849c4385ae95d83fccbfd7e719a59ddbc9d396fafde31a9cd5b9a",
-    "agents/openai.yaml": "c47219f4976f01da7d714c842fbafdcb7a242503d95dcce16880c4f0bd38d82b",
-    "references/practical.md": "56caa2513aca4148b5864cbef6cb028d01d1f14ff9196367f5ca9c801f2e2d44",
+    "agents/openai.yaml": "7404720761ddbcd63ffe0219aed9644f10d734a1e41f827e3f77e97d6b970333",
+    "references/practical.md": "763e7e1e006c08164b570364c6c48aae5b86766a14cd86982cacf873e9d7b39c",
+    "references/failures/goal-drift.md": "18f1e6f919a515c71290a9d33a5475dc66d9aaa4037d932e6d7bec8e2f150872",
+    "references/failures/context-and-tools.md": "2508f4076baa6bcab0148d8e1debb5e800dd81e602228927141da9985103bfda",
+    "references/failures/delegation-and-cost.md": "1198bb189f7bd00449fe0da2d0bd87b6b59d1bb4d9c2560106208db02876908d",
+    "references/failures/platform-and-freshness.md": "665c438efd7efe99d51502cafa5536b7b955cae13ea9174bca91b17027fe1f43",
     "references/protocol.md": "775ad630a92b91009506314fc63747c4b1d9395e746f0a102ad41b4934edf639",
-    "references/protocol-v5.md": "3c4acdbbe1b1efbaf150467aa959cf5382351bf67660309366460d8224087c32",
+    "references/protocol-v5.md": "bcdeca5c39bc4f25832452ddb0447de7e6dbb514fe7d5417c2bf4a7ce636e460",
     "references/lenses.json": "19b776e9d74c35dd6b5004aa0447db840b0c4c2f1aafa3b4fd1c38f4a8f58518",
     "scripts/diverge.py": "b34d33923f6750dd5e41bcb27da830956506ad962562b4cdf281e146571a8f47",
     "scripts/diverge_v5.py": "cd342f7259671c471ede89db30b95be7aabfd9b0ca6577c32477a55d6715457b",
@@ -44,9 +52,9 @@ RUNTIME_SHA256 = {
 }
 PEER_HOOK_SHA256 = "28db7623d7d39d8d31f76aa145ec5e09f65373470b8fb9db70e0b53596c88427"
 CONTROL_SHA256 = {
-    "0.1.0": {
+    "0.2.0": {
         ".codex-plugin/plugin.json": (
-            "9a7e194978e7d882c616bb4b1931369a9cfe89c2a9d6d9d424f1251086b3fdab"
+            "39955fa5ac817243efdb4f8264b7e5ac4955de76f82f1dde1ddbd50b1da41296"
         ),
         "hooks/hooks.json": (
             "69cd2c39c44c623ba9e39428ba33914b66df48b251f84b0851ec08e804a36847"
@@ -55,7 +63,7 @@ CONTROL_SHA256 = {
     }
 }
 INSTALL_SHA256 = {
-    "0.1.0": "75ddc8d510cc28c71a12e4ddabe13d5fd5fafa9c25282e1f14cfb0a4d5eb2f61"
+    "0.2.0": "75ddc8d510cc28c71a12e4ddabe13d5fd5fafa9c25282e1f14cfb0a4d5eb2f61"
 }
 SEMVER_RE = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
@@ -210,8 +218,8 @@ def expected_plugin_manifest(version: str) -> dict[str, Any]:
         "name": PLUGIN_NAME,
         "version": version,
         "description": (
-            "Opt-in practical and externally anchored software delivery with elastic "
-            "task-DAG coordination."
+            "Opt-in reliable engineering with reactive failure controls, elastic "
+            "task-DAG coordination, and externally anchored delivery."
         ),
         "author": {
             "name": "Mai-xiyu",
@@ -225,6 +233,10 @@ def expected_plugin_manifest(version: str) -> dict[str, Any]:
             "opt-in-skill",
             "progressive-disclosure",
             "software-engineering",
+            "agent-reliability",
+            "goal-preservation",
+            "context-recovery",
+            "tool-call-verification",
             "elastic-agent-teams",
             "task-dag",
             "isolated-candidates",
@@ -234,15 +246,16 @@ def expected_plugin_manifest(version: str) -> dict[str, Any]:
         "skills": "./skills/",
         "interface": {
             "displayName": "Wide-Lens Engineering",
-            "shortDescription": "Opt-in elastic engineering and assured delivery",
+            "shortDescription": "Opt-in reliable engineering and assured delivery",
             "longDescription": (
-                "Explicitly invoke a practical workflow or externally anchored assured "
-                "protocol with elastic task-DAG delegation."
+                "Explicitly invoke practical or externally anchored engineering with "
+                "reactive failure controls and elastic task-DAG delegation."
             ),
             "developerName": "Mai-xiyu",
             "category": "Developer Tools",
             "capabilities": [
                 "Software engineering",
+                "Agent reliability",
                 "Elastic subagents",
                 "Assured delivery",
             ],

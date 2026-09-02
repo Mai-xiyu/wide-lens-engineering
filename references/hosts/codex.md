@@ -19,6 +19,8 @@ Construct `HostCapabilities` from current runtime evidence. Never copy a static 
 
 Current public Codex subagent configuration provides root-managed spawning and joining, direct steering, custom read-only profiles, per-profile model settings, and `agents.max_depth`. It does not document an atomic shared task-claim primitive. Therefore the Codex adapter uses `root-assign`; `atomic-claim` is invalid unless a future host exposes a real controller-observed claim operation.
 
+Configured routing is not proof of effective routing. When Codex exposes the child's actual identity, model, reasoning effort, permission mode, and workspace, compare them with the assignment and record mismatches. If the runtime does not expose an effective value, record `unknown`; do not claim heterogeneous execution, pinned reasoning, enforced read-only, or isolation from the requested profile alone.
+
 Codex reapplies the parent turn's live sandbox and permission overrides to child agents. Therefore `sandbox_mode = "read-only"` in the profile is only a requested baseline; set `enforced_readonly=true` only after observing the child's effective runtime boundary.
 
 The adapter profile is suitable for `read-only-proposals`. Its sandbox setting is runtime guardrail evidence, not an assured receipt. A candidate worker is not distributed because a generic `workspace-write` profile could write the canonical checkout. Hosts that provide a genuinely isolated candidate workspace must create that worker dynamically and prove both workspace isolation and canonical write blocking.
@@ -27,9 +29,11 @@ The adapter profile is suitable for `read-only-proposals`. Its sandbox setting i
 
 1. The main model inspects the repository read-only, records capabilities, and publishes the frozen checkpoint or v5 packet reference.
 2. It creates the task DAG without a participant-count prescription.
-3. It assigns ready nodes to `wide_lens_peer` identities with `root-assign`.
+3. It assigns ready nodes to `wide_lens_peer` identities with `root-assign`, verifies that every spawn returned a real child identity, and binds later steering/join/wait operations to that exact identity. A generic exec-cell wait or placeholder ID is not a child-agent wait.
 4. Round 1 remains sealed. After sealing, use direct peer messaging only when the runtime reports that capability; otherwise relay one complete peer board through the root.
 5. The main model adjudicates evidence, applies any selected proposal, and reruns frozen acceptance against the integrated canonical state.
+
+Before retrying a failed create/spawn or any other possibly state-changing call, inspect whether the first call took effect. A surfaced handler or transport error can coexist with a delayed side effect; blind retry can create duplicate workers or external actions.
 
 Codex hooks bundled by the generated plugin inject the output headings at `SubagentStart` and request one correction at `SubagentStop` when headings are missing. Hooks do not cover every tool path and do not prove read-only behavior, isolation, chronology, identity, or absence of nested delegation. They are formatting guardrails only.
 

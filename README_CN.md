@@ -18,6 +18,7 @@ Wide-Lens Engineering 是用于真实仓库工作的 Codex Skill，不是只做 
 - 只有其他 Agent 存在正边际收益时才创建的弹性任务 DAG；
 - shared deliberation 的密封首轮与封存后挑战；
 - 宿主实际强制隔离边界时才启用的候选实现；assured 声明还必须有外部 attestation；
+- 面向目标漂移、上下文/工具故障、委派成本与平台/时效错配的按信号加载恢复卡；
 - 面向高风险交付、依赖外部 authority、receipt 与 fail-closed gate 的 `assured` v5 协议。
 
 Skill 不规定 Agent 数量、固定团队、模型或角色阵容。当前主模型根据实际宿主能力与冻结任务派生执行模式，不能根据产品名猜测能力。
@@ -34,7 +35,7 @@ Skill 不规定 Agent 数量、固定团队、模型或角色阵容。当前主�
 > [!IMPORTANT]
 > 缺少真实外部 controller、独立摘要通道、固定 verifier、隔离工件和 OS sandbox 时，Skill 必须报告 assured 前置条件不成立。
 
-[快速开始](#quick-start) · [弹性团队](#shared-subagents) · [信任边界](#trust-boundaries) · [安装](#installation) · [测试](#testing)
+[快速开始](#quick-start) · [当前故障控制](#current-failure-controls) · [弹性团队](#shared-subagents) · [信任边界](#trust-boundaries) · [安装](#installation) · [测试](#testing)
 
 <!-- section:build-week -->
 <a id="build-week"></a>
@@ -117,6 +118,25 @@ flowchart LR
 ```
 
 Ponytail 同时约束委派与实现：预期信息增益不足就不建团队；实现达到验收后立即停止增加复杂度。
+
+<!-- section:current-failure-controls -->
+<a id="current-failure-controls"></a>
+## 当前工程故障控制
+
+新的日期化证据报告明确区分官方行为、带控制的一手 issue、具体现场报告和纯经验讨论：[GPT-5.6 Sol 与 Codex 工程故障图谱](research/2026-09-02-gpt-5-6-sol-codex-engineering.md)。
+
+可操作的共性主要包括：目标/authority 漂移、meta-work 取代产品、compaction 与工具状态丢失、错误工具路由、盲目重试造成重复副作用、实际 subagent 拓扑与请求不一致、失控委派、MCP 生命周期缺口，以及 OS/sandbox/worktree 差异。不同用户对模型总体质量的报告互相矛盾，因此项目不声称 GPT-5.6 Sol 普遍更好或更差。
+
+调研报告不会打包，也不会在运行时加载。四张短卡会进入 Plugin，但只有观察到对应故障信号后才加载：
+
+| 已观察故障 | 恢复卡 | 主要修正 |
+|---|---|---|
+| 产品被流程取代、authority 反转、提前完成 | [目标漂移](references/failures/goal-drift.md) | 重新锚定产品；Agent 创建的支持材料没有 authority |
+| Compaction、工具歧义、副作用不确定、重复失败 | [上下文与工具](references/failures/context-and-tools.md) | 从持久证据恢复状态；绑定精确 handle；重试前检查 |
+| 路由/拓扑错配、重复 lane、资源增长失衡 | [委派与成本](references/failures/delegation-and-cost.md) | 观察实际 actor；停止递归和无判别力工作 |
+| 依赖 OS/client/Git/sandbox/model route 或时效 | [平台与时效](references/failures/platform-and-freshness.md) | 探测有效边界；禁止从产品名称猜能力 |
+
+这仍是显式 opt-in。即使已经调用 Wide-Lens，恢复卡也是响应式机制，不是强制 preflight；先加载最早因果故障对应的卡。它们不能修复 Codex client、backend、MCP transport、sandbox、计费或模型，只能阻止这些不确定性被包装成无依据的完成声明。
 
 <!-- section:practical -->
 <a id="practical-workflow"></a>
@@ -256,11 +276,11 @@ python scripts/install_codex_adapter.py --target /path/to/project --apply
 从 canonical 根 Skill 构建确定性 archive：
 
 ```bash
-python scripts/build_codex_plugin.py --version 0.1.0 --output-dir dist \
+python scripts/build_codex_plugin.py --version 0.2.0 --output-dir dist \
   --validator scripts/validate_codex_plugin.py --force
 python scripts/validate_codex_plugin.py \
-  dist/wide-lens-engineering-marketplace-0.1.0.zip \
-  --expected-version 0.1.0
+  dist/wide-lens-engineering-marketplace-0.2.0.zip \
+  --expected-version 0.2.0
 ```
 
 发布验证器按版本固定完整 Plugin manifest、hook 注册、hook 实现和每个运行时文件。它可以脱离本源码 checkout 独立复制运行；未知发布版本会 fail closed。
@@ -280,7 +300,7 @@ codex plugin marketplace list
 
 ### 版本规则
 
-首个公开预览包目标是 `0.1.0`。Package SemVer 与 wire schema 相互独立：packet v5 仍是协议 `version: 5`，冻结兼容路径仍是 packet v4。确定性、跨平台、性能与可复现打包门禁通过后，可以发布明确标记为未获 attestation 的 `0.x` GitHub Prerelease；外部 controller receipt 限制的是 assured 声明，而不是普通预览包的可用性。公共安装与工作流合同稳定后再使用 `1.0.0`；不能为了匹配 package 而改名 protocol v5。
+当前开发包版本是 `0.2.0`，首个公开预览是 `0.1.0`。Package SemVer 与 wire schema 相互独立：packet v5 仍是协议 `version: 5`，冻结兼容路径仍是 packet v4。确定性、跨平台、性能与可复现打包门禁通过后，可以发布明确标记为未获 attestation 的 `0.x` GitHub Prerelease；外部 controller receipt 限制的是 assured 声明，而不是普通预览包的可用性。公共安装与工作流合同稳定后再使用 `1.0.0`；不能为了匹配 package 而改名 protocol v5。
 
 <!-- section:testing -->
 <a id="testing"></a>
@@ -291,6 +311,7 @@ codex plugin marketplace list
 ```bash
 python -B tests/run_eval.py --threshold 1.0 --json
 python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
+python -B tests/run_failure_cards_eval.py --threshold 1.0 --json
 python -B scripts/validate_skill.py .
 ```
 
@@ -316,8 +337,10 @@ wide-lens-engineering/
 │   ├── practical.md                 # Practical Elastic
 │   ├── protocol.md                  # 冻结 assured v4
 │   ├── protocol-v5.md               # Assured Elastic v5
+│   ├── failures/                     # 仅按故障信号加载的恢复卡
 │   ├── hosts/codex.md               # 已验证 Codex 映射
 │   └── lenses.json                  # 冻结分析 catalog
+├── research/                         # 日期化证据快照，不进入 runtime
 ├── packaging/codex-plugin-src/      # Plugin-only manifest 与 hook
 ├── benchmarks/codex-live-v1/        # 外部 live-coding 门禁合同
 ├── scripts/                         # v4 冻结工具、v5 工具、installer/builder
@@ -331,6 +354,8 @@ wide-lens-engineering/
 ## 参考与关键词
 
 - [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+- [GPT-5.6 model guidance](https://developers.openai.com/api/docs/guides/latest-model)
+- [当前 GPT-5.6 Sol / Codex 故障图谱](research/2026-09-02-gpt-5-6-sol-codex-engineering.md)
 - [Codex hooks](https://learn.chatgpt.com/docs/hooks)
 - [Build Codex plugins](https://learn.chatgpt.com/docs/build-plugins)
 - [Git worktree](https://git-scm.com/docs/git-worktree)
@@ -339,4 +364,4 @@ wide-lens-engineering/
 - [GitHub deployment environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)
 - [OpenSSH signed-data verification](https://man.openbsd.org/ssh-keygen)
 
-搜索关键词：Codex Skill、elastic agent teams、adaptive multi-agent coding、dynamic task DAG、isolated candidates、capability negotiation、capability leases、single canonical writer、independent verifier、assured software delivery、zero-trust agent protocol、sealed deliberation、adversarial debugging、root-cause analysis、code generation、refactoring、migration、Ponytail、YAGNI。
+搜索关键词：Codex Skill、GPT-5.6 Sol、agent reliability、goal preservation、context compaction recovery、tool-call verification、elastic agent teams、adaptive multi-agent coding、dynamic task DAG、isolated candidates、capability negotiation、capability leases、single canonical writer、independent verifier、assured software delivery、zero-trust agent protocol、sealed deliberation、adversarial debugging、root-cause analysis、code generation、refactoring、migration、Ponytail、YAGNI。

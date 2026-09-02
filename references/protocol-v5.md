@@ -28,6 +28,8 @@ Packet v5 embeds the complete `contract v1` and refers to the complete `baseline
 
 The execution Agent may not add, reinterpret, or replace any contract field. A semantic change to objective, write scope, acceptance, non-goal, safety boundary, or authority requires a new user-approved contract revision and packet lineage.
 
+The contract's requested product remains distinct from protocol support. Packets, manifests, digests, plans, tests, reports, checkers, gates, leases, and receipts are evidence or controls; they are never the product, a new authority source, or an acceptance criterion. The independent verifier must check the product through the frozen acceptance criteria, and the gate rejects a failing result even when every protocol artifact is internally valid. The checker cannot infer product semantics beyond that frozen contract, so acceptance must describe the product rather than protocol completion. Agent-created support cannot become a cleanup exception or authorize changes to user-owned work.
+
 ### 2.2 Packet v5
 
 The v5 planner calls the frozen v4 builder with `profile=full`, changes only `version` from `4` to `5`, adds `orchestration_policy`, and recalculates `packet_sha256`. Every other field must equal a fresh v4 reconstruction byte-for-byte under canonical JSON.

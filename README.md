@@ -18,6 +18,7 @@ Wide-Lens Engineering is a reusable Codex Skill for real repository work, not a 
 - elastic task-DAG delegation when another agent has positive marginal value;
 - sealed first-round analysis and post-seal challenge for shared deliberation;
 - isolated candidate implementations when the host enforces that boundary, with external attestation required for assured claims;
+- reactive failure cards for goal drift, context/tool failures, delegation cost, and platform/freshness mismatches;
 - an `assured` v5 protocol for deliveries that require external authority, receipts, and a fail-closed gate.
 
 The Skill never prescribes an agent count, fixed team, model, or role roster. The active main model derives the execution mode from observed host capabilities and the frozen task—not from a product name.
@@ -34,7 +35,7 @@ Installing the Skill does **not** opt every coding session into this workflow. I
 > [!IMPORTANT]
 > Without a real external controller, independent digest channel, pinned verifier, isolated artifacts, and OS sandbox, the skill must report that assured preconditions are unmet.
 
-[Quick start](#quick-start) · [Agent teams](#shared-subagents) · [Trust boundaries](#trust-boundaries) · [Installation](#installation) · [Testing](#testing)
+[Quick start](#quick-start) · [Current failure controls](#current-failure-controls) · [Agent teams](#shared-subagents) · [Trust boundaries](#trust-boundaries) · [Installation](#installation) · [Testing](#testing)
 
 <!-- section:build-week -->
 <a id="build-week"></a>
@@ -117,6 +118,25 @@ flowchart LR
 ```
 
 Ponytail constrains both delegation and implementation: do not create a team without expected information gain, and stop at the first implementation rung that satisfies acceptance.
+
+<!-- section:current-failure-controls -->
+<a id="current-failure-controls"></a>
+## Current engineering failure controls
+
+A dated evidence review now separates official behavior, controlled issue reports, concrete field reports, and anecdotes: [GPT-5.6 Sol and Codex engineering failure landscape](research/2026-09-02-gpt-5-6-sol-codex-engineering.md).
+
+The recurring actionable classes are goal/authority drift, meta-work replacing the product, compaction and tool-state loss, wrong tool routing, duplicate side effects after blind retries, effective subagent topology differing from requested topology, runaway delegation, MCP lifecycle gaps, and OS/sandbox/worktree variation. Reports conflict on overall model quality, so the project does not label GPT-5.6 Sol universally better or worse.
+
+The research report is never packaged or loaded at runtime. Four short cards are packaged but remain dormant until an observed signal matches one of them:
+
+| Observed failure | Reactive card | Main correction |
+|---|---|---|
+| Product displaced by process, authority reversal, premature completion | [goal drift](references/failures/goal-drift.md) | Re-anchor the product; Agent-created support has no authority |
+| Compaction, ambiguous tools, uncertain side effects, repeated failure | [context and tools](references/failures/context-and-tools.md) | Rebuild durable state; bind exact handles; inspect before retry |
+| Routing/topology mismatch, repeated lanes, disproportionate resource growth | [delegation and cost](references/failures/delegation-and-cost.md) | Observe actual actors; stop recursion and non-discriminating work |
+| OS/client/Git/sandbox/model-route or freshness dependency | [platform and freshness](references/failures/platform-and-freshness.md) | Probe the effective boundary; never infer it from product names |
+
+This remains explicit opt-in. Even inside an invoked Wide-Lens run, cards are reactive rather than a mandatory preflight, and the earliest causal card is loaded first. The cards cannot repair the Codex client, backend, MCP transport, sandbox, billing, or model; they prevent those uncertainties from being converted into unsupported completion claims.
 
 <!-- section:practical -->
 <a id="practical-workflow"></a>
@@ -256,11 +276,11 @@ The adapter writes only `.codex/config.toml` with `agents.max_depth = 1` and `.c
 Build a deterministic archive from the canonical root Skill:
 
 ```bash
-python scripts/build_codex_plugin.py --version 0.1.0 --output-dir dist \
+python scripts/build_codex_plugin.py --version 0.2.0 --output-dir dist \
   --validator scripts/validate_codex_plugin.py --force
 python scripts/validate_codex_plugin.py \
-  dist/wide-lens-engineering-marketplace-0.1.0.zip \
-  --expected-version 0.1.0
+  dist/wide-lens-engineering-marketplace-0.2.0.zip \
+  --expected-version 0.2.0
 ```
 
 The release validator pins the complete plugin manifest, hook registration, hook implementation, and every runtime file by version. It can be copied and run independently of this source checkout; an unknown release version fails closed.
@@ -280,7 +300,7 @@ Generated archives live in ignored `dist/`, so packaging never creates a second 
 
 ### Versioning
 
-The first public-preview package target is `0.1.0`. Package SemVer is independent of wire schemas: packet v5 remains protocol `version: 5`, and the frozen compatibility path remains packet v4. A `0.x` GitHub Prerelease may be published after deterministic, cross-platform, performance, and reproducible-package gates pass, provided it is explicitly labeled unattested. External controller receipts gate an assured claim, not ordinary preview package availability. Use `1.0.0` when the public installation and workflow contract is stable; do not rename protocol v5 to match the package.
+The current development package is `0.2.0`; the first public preview was `0.1.0`. Package SemVer is independent of wire schemas: packet v5 remains protocol `version: 5`, and the frozen compatibility path remains packet v4. A `0.x` GitHub Prerelease may be published after deterministic, cross-platform, performance, and reproducible-package gates pass, provided it is explicitly labeled unattested. External controller receipts gate an assured claim, not ordinary preview package availability. Use `1.0.0` when the public installation and workflow contract is stable; do not rename protocol v5 to match the package.
 
 <!-- section:testing -->
 <a id="testing"></a>
@@ -291,6 +311,7 @@ The full maintainer matrix, reproducible packaging commands, and release policy 
 ```bash
 python -B tests/run_eval.py --threshold 1.0 --json
 python -B tests/run_forward_eval.py --threshold 1.0 --require-no-skips --json
+python -B tests/run_failure_cards_eval.py --threshold 1.0 --json
 python -B scripts/validate_skill.py .
 ```
 
@@ -323,8 +344,10 @@ wide-lens-engineering/
 │   ├── practical.md                 # Practical Elastic
 │   ├── protocol.md                  # frozen assured v4
 │   ├── protocol-v5.md               # Assured Elastic v5
+│   ├── failures/                     # reactive, selectively loaded recovery cards
 │   ├── hosts/codex.md               # verified Codex mapping
 │   └── lenses.json                  # frozen analysis catalog
+├── research/                         # dated evidence snapshots, never runtime-loaded
 ├── packaging/codex-plugin-src/      # plugin-only manifest and hooks
 ├── benchmarks/codex-live-v1/        # external live-coding gate contract
 ├── scripts/                         # v4 frozen tools, v5 tools, installers/builders
@@ -338,6 +361,8 @@ wide-lens-engineering/
 ## References and search terms
 
 - [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+- [GPT-5.6 model guidance](https://developers.openai.com/api/docs/guides/latest-model)
+- [Current GPT-5.6 Sol / Codex failure landscape](research/2026-09-02-gpt-5-6-sol-codex-engineering.md)
 - [Codex hooks](https://learn.chatgpt.com/docs/hooks)
 - [Build Codex plugins](https://learn.chatgpt.com/docs/build-plugins)
 - [Git worktree](https://git-scm.com/docs/git-worktree)
@@ -346,4 +371,4 @@ wide-lens-engineering/
 - [GitHub deployment environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)
 - [OpenSSH signed-data verification](https://man.openbsd.org/ssh-keygen)
 
-Search keywords: Codex Skill, elastic agent teams, adaptive multi-agent coding, dynamic task DAG, isolated candidates, capability negotiation, capability leases, single canonical writer, independent verifier, assured software delivery, zero-trust agent protocol, sealed deliberation, adversarial debugging, root-cause analysis, code generation, refactoring, migration, Ponytail, YAGNI.
+Search keywords: Codex Skill, GPT-5.6 Sol, agent reliability, goal preservation, context compaction recovery, tool-call verification, elastic agent teams, adaptive multi-agent coding, dynamic task DAG, isolated candidates, capability negotiation, capability leases, single canonical writer, independent verifier, assured software delivery, zero-trust agent protocol, sealed deliberation, adversarial debugging, root-cause analysis, code generation, refactoring, migration, Ponytail, YAGNI.
